@@ -10,14 +10,18 @@ from pprint import pprint
 # linear regression feature importance
 from sklearn.datasets import make_regression
 import pandas as pd
+import cmath as math
+import sys
 from numpy import unique
 from numpy import where
+import numpy as np
+import plotly.graph_objects as go
 from sklearn.cluster import AffinityPropagation
 from sklearn.cluster import AgglomerativeClustering
 from sklearn.cluster import Birch
 from sklearn.cluster import DBSCAN
 from sklearn.cluster import KMeans
-
+import matplotlib.pyplot as plt
 from sklearn.datasets import make_classification
 from sklearn.linear_model import LinearRegression, LogisticRegression
 from sklearn.tree import DecisionTreeRegressor
@@ -26,12 +30,14 @@ from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor, Extr
     GradientBoostingRegressor
 from sklearn import metrics  # Import scikit-learn metrics module for accuracy calculation
 
+
+
 from matplotlib import pyplot
 
 network_identifier = 'balakot'
 use_time = False
 use_rows = False
-use_hashtags = False
+use_hashtags = True
 no_of_rows_per_run = 5
 time_delta = 3600 #in seconds (unix , 3600 = 1 hour, 86400 = day)
 
@@ -45,7 +51,7 @@ lastdate = []
 data = []
 
 
-def preprocess_to_csv(input_json):
+def preprocess_to_list(input_json):
     """
     Authors:
      - Nathan
@@ -165,26 +171,28 @@ def calc_linear_regression_and_importance_coefficient(network_identifier, in_lis
     model.fit(X_train, y_train)
     # make prediction based on model
     y_pred = model.predict(X_test)
+    #print('this is y_pred', y_pred)
 
     # get importance
     importance = model.coef_
     # summarize feature importance
     networkattributes = {}
     for i, v in enumerate(importance):
-        print('Feature: %0d, Score: %.5f' % (i, v))
+        #print('Feature: %0d, Score: %.5f' % (i, v))
         networkattributes['Feature: %0d' % (i)] = v
 
     # plot feature importance
-    pyplot.bar([x for x in range(len(importance))], importance)
-    print('these are net attributes that resulted in the previous plot', networkattributes)
-    pyplot.show()
+    #pyplot.bar([x for x in range(len(importance))], importance)
+    #print('these are net attributes that resulted in the previous plot', networkattributes)
+    #pyplot.show()
     #pyplot.savefig(f'lr_{network_identifier}.png')
+
 
     return networkattributes
 
 
 
-def cluster_results(data_in):
+def create_subspace_cluster(data_in):
     """
        Authors:
         - Nathan
@@ -195,29 +203,71 @@ def cluster_results(data_in):
 
 
     #X, _ = make_classification(n_samples=1000, n_features=2, n_informative=2, n_redundant=0, n_clusters_per_class=1, random_state=4)
-    X = []
-    for value in data_in.values():
-        if abs(value) > 0.1:
-            X.append(value)
-    print(X)
+    X = data_in
+    Xcomponet = []
+    Ycomponet = []
+    Zcomponet = []
+    PLOT = go.Figure()
+    for i in X.values():
+        newX = i[0]
+        newY = i[1]
+        newZ = i[2]
+        Xcomponet.append(newX)
+        Ycomponet.append(newY)
+        Zcomponet.append(newZ)
+
+
+    A = np.array(list(zip(Xcomponet, Ycomponet, Zcomponet)))
+    print(A)
+
+    PLOT.add_trace(go.Scatter3d(x=Xcomponet,
+                                    y=Ycomponet,
+                                    z=Zcomponet))
+    PLOT.show()
     # define the model
-    model = DBSCAN()
+    #model = DBSCAN()
     # fit the model
-    model.fit(X)
+    #model.fit(A)
     # assign a cluster to each example
-    yhat = model.fit_predict(X)
+    #yhat = model.fit_predict(A)
+    #print('this is yhat', yhat)
     # retrieve unique clusters
-    clusters = unique(yhat)
+    #clusters = unique(yhat)
     # create scatter plot for samples from each cluster
-    for cluster in clusters:
+    #for cluster in clusters:
         # get row indexes for samples with this cluster
-        row_ix = where(yhat == cluster)
+        #row_ix = where(yhat == cluster)
         # create scatter of these samples
-        pyplot.scatter(X[row_ix, 0], X[row_ix, 1])
+        #pyplot.Scatter3d(A[row_ix, 0], A[row_ix, 1], A[row_ix, 2])
     # outputs
-    pyplot.show()
+    #pyplot.show()
     #pyplot.savefig(f'cluster_{network_identifier}.png')
 
+def plotting3d(data_in):
+
+    X = data_in
+    Xcomponet = []
+    Ycomponet = []
+    Zcomponet = []
+    listofdatapoints = []
+    for i in X:
+        listofdatapoints.append(i)
+    labels = np.asarray(listofdatapoints)
+    plotL = plotlabels[listofdatapoints]
+    for i in X.values():
+        newX = i[0]
+        newY = i[1]
+        newZ = i[2]
+        Xcomponet.append(newX)
+        Ycomponet.append(newY)
+        Zcomponet.append(newZ)
+
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.scatter(Xcomponet, Ycomponet, Zcomponet, labels
+
+    plt.title("3D Scatter plot of CNAs for hashtag networks")
+    plt.show()
 
 def separate_list_by_rows(list_in, no_of_rows):
     '''
@@ -265,7 +315,6 @@ def separate_list_by_time(list_in):
     for ind_record in list_in:
         if first_run:
             starttime = ind_record[17]
-            print(starttime)
             first_run = False
         else:
             pass
@@ -286,17 +335,6 @@ def separate_list_by_time(list_in):
     print('this is time divided data', list_out)
     return list_out
 
-    # go through list, start time = first time.
-        # finish time is start time + time detla
-        # dumps first file as counter 1
-        # new start time = finish time.
-        # new finish time is start time + time delta.
-        # returns list of lists
-
-
-
-        # end the current row and then start a new one
-
 
 def separate_by_hashtags(list_in):
     hashtagtracker = []
@@ -314,19 +352,49 @@ def separate_by_hashtags(list_in):
 
     for key in hashtagtracker:
         mainsethashtag[key] = hashtagnetwork["%s" % key]
-    print(mainsethashtag)
+    print('this is mainsethashtag - hashtagtracker', mainsethashtag)
     return mainsethashtag
+
+def cluster_results(list_in):
+    """
+          Authors:
+           - Nathan
+          Date: 15 2021 July
+          Aim:
+          Cluster the Campaign Network Attributes generated by the importance assessment in importance coefficient function
+          """
+
+    X, _ = make_classification(n_samples=1000, n_features=2, n_informative=2, n_redundant=0, n_clusters_per_class=1, random_state=0)
+    print(X)
+    # define the model
+    model = DBSCAN()
+    # fit the model
+    model.fit(X)
+    # assign a cluster to each example
+    yhat = model.fit_predict(X)
+    # retrieve unique clusters
+    clusters = unique(yhat)
+    # create scatter plot for samples from each cluster
+    for cluster in clusters:
+        # get row indexes for samples with this cluster
+        row_ix = where(yhat == cluster)
+        # create scatter of these samples
+        pyplot.scatter(X[row_ix, 0], X[row_ix, 1])
+    # outputs
+    pyplot.show()
+    pyplot.savefig(f'cluster_{network_identifier}.png')
 
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
 
     infile = "D:/TweetBinder and Other datasets/Twitter Balakot datasets/d96e4d83-6c6c-4cd9-a74f-9be85c6bb024.json"
-
+    outputclusterfile = "D:/TweetBinder and Other datasets/Twitter Balakot datasets/clusterfile.csv"
     input_json = {}
     separated_preprocessed_list = []
+    storeattributes = []
     with open(infile, encoding='utf-8') as JSONfile:
         input_json = json.load(JSONfile)
-    preprocessed_list = preprocess_to_csv(input_json)
+    preprocessed_list = preprocess_to_list(input_json)
     if use_rows:
         separated_preprocessed_list = separate_list_by_rows(preprocessed_list, no_of_rows_per_run)
         print('Data separated rows')
@@ -349,13 +417,31 @@ if __name__ == '__main__':
         print('Data separated by Hashtag')
         hashtagtracker = separate_by_hashtags(preprocessed_list)
         run_no = 0
-        for run_in in hashtagtracker.values():
-            if len(run_in) >= 3000: #this number can be fine turned to determine the hashtag network size analysed.
-                net_attributes = calc_linear_regression_and_importance_coefficient(f'{run_in}_{run_no}', run_in)
+        #cluster_dict = {"Run number": [], "Hashtags": [], "X axis": [], "Y axis": [], "Z axis": []}
+        cluster_dict = {}
+        csv_columns = ['Run number', 'Hashtags', 'X axis', 'Y axis', 'Z axis']
+        for run_in1 in hashtagtracker:
+            run_in2 = hashtagtracker[run_in1]
+            if len(run_in2) >= 100:  # this number can be fine turned to determine the hashtag network size analysed.
+                print('running hashtag', run_in1)
+                print(len(run_in2))
+                cluster_list = []
+                net_attributes = calc_linear_regression_and_importance_coefficient(f'{run_in2}_{run_no}', run_in2)
+                cluster_list.append(net_attributes['Feature: 0']) #these features create the subspace
+                cluster_list.append(net_attributes['Feature: 3'])
+                cluster_list.append(net_attributes['Feature: 5'])
+                cluster_dict[run_in1] = cluster_list
                 run_no = run_no + 1
-                #cluster_results(net_attributes)
             else:
-                continue
+               continue
+
+        print(cluster_dict)
+        #create_subspace_cluster(cluster_dict)
+        plotting3d(cluster_dict)
+
+
+
+
     else:
         print('Undivided data used')
         separated_preprocessed_list = [preprocessed_list]
