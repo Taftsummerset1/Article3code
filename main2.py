@@ -216,7 +216,6 @@ def create_subspace_cluster(data_in):
         Ycomponet.append(newY)
         Zcomponet.append(newZ)
 
-
     A = np.array(list(zip(Xcomponet, Ycomponet, Zcomponet)))
     print(A)
 
@@ -253,7 +252,6 @@ def plotting3d(data_in):
     for i in X:
         listofdatapoints.append(i)
     labels = np.asarray(listofdatapoints)
-    plotL = plotlabels[listofdatapoints]
     for i in X.values():
         newX = i[0]
         newY = i[1]
@@ -261,12 +259,11 @@ def plotting3d(data_in):
         Xcomponet.append(newX)
         Ycomponet.append(newY)
         Zcomponet.append(newZ)
-
+        zyxcomponet = zip(Xcomponet, Ycomponet, Zcomponet)
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
-    ax.scatter(Xcomponet, Ycomponet, Zcomponet, labels
-
-    plt.title("3D Scatter plot of CNAs for hashtag networks")
+    ax.scatter(Xcomponet, Ycomponet, Zcomponet)
+    plt.title("3D Scatter plot of CNAs for Hashtag networks")
     plt.show()
 
 def separate_list_by_rows(list_in, no_of_rows):
@@ -387,7 +384,7 @@ def cluster_results(list_in):
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
 
-    infile = "D:/TweetBinder and Other datasets/Twitter Balakot datasets/d96e4d83-6c6c-4cd9-a74f-9be85c6bb024.json"
+    infile = "D:/TweetBinder and Other datasets/Twitter Balakot datasets/7e3c13ed-3333-4d5b-ab70-ebdb583f466d.json"
     outputclusterfile = "D:/TweetBinder and Other datasets/Twitter Balakot datasets/clusterfile.csv"
     input_json = {}
     separated_preprocessed_list = []
@@ -422,7 +419,7 @@ if __name__ == '__main__':
         csv_columns = ['Run number', 'Hashtags', 'X axis', 'Y axis', 'Z axis']
         for run_in1 in hashtagtracker:
             run_in2 = hashtagtracker[run_in1]
-            if len(run_in2) >= 100:  # this number can be fine turned to determine the hashtag network size analysed.
+            if len(run_in2) >= 200:  # this number can be fine turned to determine the hashtag network size analysed.
                 print('running hashtag', run_in1)
                 print(len(run_in2))
                 cluster_list = []
