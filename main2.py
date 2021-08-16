@@ -12,6 +12,7 @@ from sklearn.datasets import make_regression
 import pandas as pd
 import cmath as math
 import sys
+from matplotlib.ticker import MaxNLocator
 from numpy import unique
 from numpy import where
 import numpy as np
@@ -21,7 +22,8 @@ from sklearn.cluster import AgglomerativeClustering
 from sklearn.cluster import Birch
 from sklearn.cluster import DBSCAN
 from sklearn.cluster import KMeans
-import matplotlib.pyplot as plt
+
+import matplotlib as plt
 from sklearn.datasets import make_classification
 from sklearn.linear_model import LinearRegression, LogisticRegression
 from sklearn.tree import DecisionTreeRegressor
@@ -182,17 +184,15 @@ def calc_linear_regression_and_importance_coefficient(network_identifier, in_lis
         networkattributes['Feature: %0d' % (i)] = v
 
     # plot feature importance
-    #pyplot.bar([x for x in range(len(importance))], importance)
-    #print('these are net attributes that resulted in the previous plot', networkattributes)
-    #pyplot.show()
+    #plt.pyplot.bar([x for x in range(len(importance))], importance)
+    # Set number of ticks for x-axis
+    #plt.pyplot.xticks(range(len(importance)), feature_cols, rotation='vertical')
+    #plt.pyplot.show()
     #pyplot.savefig(f'lr_{network_identifier}.png')
-
 
     return networkattributes
 
-
-
-def create_subspace_cluster(data_in):
+def clustering3d(data_in):
     """
        Authors:
         - Nathan
@@ -362,13 +362,13 @@ def cluster_results(list_in):
           """
 
     X, _ = make_classification(n_samples=1000, n_features=2, n_informative=2, n_redundant=0, n_clusters_per_class=1, random_state=0)
-    print(X)
+    data = np.array(list_in)
     # define the model
     model = DBSCAN()
     # fit the model
-    model.fit(X)
+    model.fit(data)
     # assign a cluster to each example
-    yhat = model.fit_predict(X)
+    yhat = model.fit_predict(data)
     # retrieve unique clusters
     clusters = unique(yhat)
     # create scatter plot for samples from each cluster
@@ -384,7 +384,7 @@ def cluster_results(list_in):
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
 
-    infile = "D:/TweetBinder and Other datasets/Twitter Balakot datasets/7e3c13ed-3333-4d5b-ab70-ebdb583f466d.json"
+    infile = "D:/TweetBinder and Other datasets/Twitter Balakot datasets/5dd75c59-233c-47e7-ad25-e493710778fe.json"
     outputclusterfile = "D:/TweetBinder and Other datasets/Twitter Balakot datasets/clusterfile.csv"
     input_json = {}
     separated_preprocessed_list = []
@@ -416,25 +416,37 @@ if __name__ == '__main__':
         run_no = 0
         #cluster_dict = {"Run number": [], "Hashtags": [], "X axis": [], "Y axis": [], "Z axis": []}
         cluster_dict = {}
-        csv_columns = ['Run number', 'Hashtags', 'X axis', 'Y axis', 'Z axis']
+        csv_columns = ['Run number', 'X axis', 'Y axis', 'Z axis']
+        with open(outputclusterfile, "w", newline='') as dump:
+            writer = csv.writer(dump)
+            writer.writerow(csv_columns)
         for run_in1 in hashtagtracker:
             run_in2 = hashtagtracker[run_in1]
-            if len(run_in2) >= 2000:  # this number can be fine turned to determine the hashtag network size analysed.
+            if len(run_in2) >= 10:  # this number can be fine turned to determine the hashtag network size analysed.
+                run_no = run_no + 1
                 print('running hashtag', run_in1)
                 print(len(run_in2))
                 cluster_list = []
                 net_attributes = calc_linear_regression_and_importance_coefficient(f'{run_in2}_{run_no}', run_in2)
-                cluster_list.append(net_attributes['Feature: 1']) #these features create the subspace
+                cluster_list.append(run_no)
+                #cluster_list.append(run_in1)
+                cluster_list.append(net_attributes['Feature: 1'])  # these features create the subspace
                 cluster_list.append(net_attributes['Feature: 6'])
                 cluster_list.append(net_attributes['Feature: 0'])
                 cluster_dict[run_in1] = cluster_list
-                run_no = run_no + 1
+                with open(outputclusterfile, "a", newline='', encoding='utf-8') as dump:
+                    writer = csv.writer(dump)
+                    writer.writerow(cluster_list)
+                    dump.close()
+
             else:
                continue
 
-        print(cluster_dict)
+
+
+        #print(cluster_dict)
         #create_subspace_cluster(cluster_dict)
-        plotting3d(cluster_dict)
+        clustering3d(cluster_dict)
 
 
 
@@ -443,10 +455,28 @@ if __name__ == '__main__':
         print('Undivided data used')
         separated_preprocessed_list = [preprocessed_list]
         run_no = 0
-        for run_in in separated_preprocessed_list:
-            net_attributes = calc_linear_regression_and_importance_coefficient(f'{network_identifier}_{run_no}', run_in)
+        cluster_dict = []
+        header = ['images', 'second', 'third']
+        with open(outputclusterfile, "w", newline='') as dump:
+            writer = csv.writer(dump)
+            writer.writerow(header)
+        for run_in1 in separated_preprocessed_list:
+            net_attributes = calc_linear_regression_and_importance_coefficient(f'{run_in1}_{run_no}', run_in1)
+            feature1 = (net_attributes['Feature: 1'])  # these features create the subspace
+            feature2 = (net_attributes['Feature: 6'])
+            feature3 = (net_attributes['Feature: 0'])
             run_no = run_no + 1
-            cluster_results(net_attributes)
+            with open(outputclusterfile, "a", newline='') as dump:
+                writer = csv.writer(dump)
+                data = [feature1, feature2, feature3]
+                writer.writerow(data)
+                dump.close()
+
+            #cluster_results(net_attributes)
+
+
+
+
 
 
 
