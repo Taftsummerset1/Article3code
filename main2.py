@@ -419,14 +419,14 @@ if __name__ == '__main__':
         csv_columns = ['Run number', 'Hashtags', 'X axis', 'Y axis', 'Z axis']
         for run_in1 in hashtagtracker:
             run_in2 = hashtagtracker[run_in1]
-            if len(run_in2) >= 200:  # this number can be fine turned to determine the hashtag network size analysed.
+            if len(run_in2) >= 2000:  # this number can be fine turned to determine the hashtag network size analysed.
                 print('running hashtag', run_in1)
                 print(len(run_in2))
                 cluster_list = []
                 net_attributes = calc_linear_regression_and_importance_coefficient(f'{run_in2}_{run_no}', run_in2)
-                cluster_list.append(net_attributes['Feature: 0']) #these features create the subspace
-                cluster_list.append(net_attributes['Feature: 3'])
-                cluster_list.append(net_attributes['Feature: 5'])
+                cluster_list.append(net_attributes['Feature: 1']) #these features create the subspace
+                cluster_list.append(net_attributes['Feature: 6'])
+                cluster_list.append(net_attributes['Feature: 0'])
                 cluster_dict[run_in1] = cluster_list
                 run_no = run_no + 1
             else:
