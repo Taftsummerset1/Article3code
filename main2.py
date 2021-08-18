@@ -38,9 +38,9 @@ from matplotlib import pyplot
 
 network_identifier = 'balakot'
 use_time = False
-use_rows = False
-use_hashtags = True
-no_of_rows_per_run = 5
+use_rows = True
+use_hashtags = False
+no_of_rows_per_run = 1000
 time_delta = 3600 #in seconds (unix , 3600 = 1 hour, 86400 = day)
 
 cumulativeevent = 0
@@ -386,12 +386,14 @@ if __name__ == '__main__':
 
     infile = "D:/TweetBinder and Other datasets/Twitter Balakot datasets/5dd75c59-233c-47e7-ad25-e493710778fe.json"
     outputclusterfile = "D:/TweetBinder and Other datasets/Twitter Balakot datasets/clusterfile.csv"
+    timeoutputfile = "D:/TweetBinder and Other datasets/Twitter Balakot datasets/timeview.csv"
     input_json = {}
     separated_preprocessed_list = []
     storeattributes = []
     with open(infile, encoding='utf-8') as JSONfile:
         input_json = json.load(JSONfile)
     preprocessed_list = preprocess_to_list(input_json)
+    timeview = []
     if use_rows:
         separated_preprocessed_list = separate_list_by_rows(preprocessed_list, no_of_rows_per_run)
         print('Data separated rows')
@@ -399,7 +401,11 @@ if __name__ == '__main__':
         for run_in in separated_preprocessed_list:
             net_attributes = calc_linear_regression_and_importance_coefficient(f'{network_identifier}_{run_no}', run_in)
             run_no = run_no + 1
-            cluster_results(net_attributes)
+            with open(timeoutputfile, "a", newline='', encoding='utf-8') as dump:
+                writer = csv.writer(dump)
+                writer.writerow(net_attributes.values())
+                dump.close()
+
 
     elif use_time:
         separated_preprocessed_list = separate_list_by_time(preprocessed_list)
