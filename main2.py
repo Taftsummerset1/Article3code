@@ -40,18 +40,14 @@ from matplotlib import pyplot
 network_identifier = 'balakot'
 dataset1type = 'TweetBinder'
 dataset2type = 'TweetBinder'
-use_entirecampaign = False
+use_entirecampaign = True
 use_time = False
 use_rows = False
-use_hashtags = True
-use_2_datasets = True
+use_hashtags = False
+use_2_datasets = False
 no_of_rows_per_run = 500 #used to divide the main campaign
 no_of_tweets_per_hashtag = 1000
 time_delta = 3600 #in seconds (unix , 3600 = 1 hour, 86400 = day)
-
-if use_2_datasets:
-    use_2_hashtags = True
-    use_2_rows = True
 
 cumulativeevent = 0
 cumulativeimg = 0
@@ -422,33 +418,43 @@ def clustering3d(data_in1, data_in2):
 
     A = np.array(list(zip(Xcomponet, Ycomponet, Zcomponet, clusters)))
 
+    if use_2_datasets:
+        Y = data_in2
+        X1componet = []
+        Y1componet = []
+        Z1componet = []
+        clusters1 = []
+        PLOT = go.Figure()
+        for i in Y.values():
+            newX = i[0]
+            newY = i[1]
+            newZ = i[2]
+            X1componet.append(newX)
+            Y1componet.append(newY)
+            Z1componet.append(newZ)
+            clusters1.append(1)
+        B = np.array(list(zip(X1componet, Y1componet, Z1componet, clusters1)))
+        C = np.concatenate((A, B), axis=0)
+        df = pd.DataFrame(C, columns=['Feature1', 'Feature2', 'Feature3', "Cluster"])
+        fig = pyplot.figure()
+        ax = fig.add_subplot(111, projection='3d')
+        x = np.array(df['Feature1'])
+        y = np.array(df['Feature2'])
+        z = np.array(df['Feature3'])
+        ax.scatter(x, y, z, marker="s", c=df["Cluster"], s=40, cmap="RdBu")
+        pyplot.show()
 
-    Y = data_in2
-    X1componet = []
-    Y1componet = []
-    Z1componet = []
-    clusters1 = []
-    PLOT = go.Figure()
-    for i in Y.values():
-        newX = i[0]
-        newY = i[1]
-        newZ = i[2]
-        X1componet.append(newX)
-        Y1componet.append(newY)
-        Z1componet.append(newZ)
-        clusters1.append(1)
-    B = np.array(list(zip(X1componet, Y1componet, Z1componet, clusters1)))
-    C = np.concatenate((A, B), axis=0)
+    else:
+        df = pd.DataFrame(A, columns=['Feature1', 'Feature2', 'Feature3', "Cluster"])
+        fig = pyplot.figure()
+        ax = fig.add_subplot(111, projection='3d')
+        x = np.array(df['Feature1'])
+        y = np.array(df['Feature2'])
+        z = np.array(df['Feature3'])
+        ax.scatter(x, y, z, marker="s", c=df["Cluster"], s=40, cmap="RdBu")
+        pyplot.show()
 
-    df = pd.DataFrame(C, columns=['Feature1', 'Feature2', 'Feature3', "Cluster"])
 
-    fig = pyplot.figure()
-    ax = fig.add_subplot(111, projection='3d')
-    x = np.array(df['Feature1'])
-    y = np.array(df['Feature2'])
-    z = np.array(df['Feature3'])
-    ax.scatter(x, y, z, marker="s", c=df["Cluster"], s=40, cmap="RdBu")
-    pyplot.show()
 
     # define the model
     #model = DBSCAN()
@@ -666,10 +672,8 @@ if __name__ == '__main__':
                 writer = csv.writer(dump)
                 writer.writerow(net_attributes1.values())
                 dump.close()
-        else:
-            pass
 
-        if use_2_rows:
+        if use_2_datasets:
             separated_preprocessed_list2 = separate_list_by_rows(preprocessed_list2, no_of_rows_per_run)
             run_no = 0
             for run_in in separated_preprocessed_list2:
@@ -687,6 +691,10 @@ if __name__ == '__main__':
                     dump.close()
             print(cluster_dict1, cluster_dict2)
             clustering3d(cluster_dict1, cluster_dict2)
+
+        else:
+            null = {}
+            clustering3d(cluster_dict1, null)
 
     elif use_hashtags:
         print('Data separated by', no_of_tweets_per_hashtag, 'hashtags')
@@ -725,7 +733,7 @@ if __name__ == '__main__':
                     writer.writerow(net_attributes.values())
                     dump.close()
 
-        if use_2_hashtags:
+        if use_2_datasets:
             print('Data separated by Hashtag2')
             hashtagtracker2 = separate_by_hashtags(preprocessed_list2)
             run_no = 0
@@ -757,12 +765,16 @@ if __name__ == '__main__':
                     cluster_list1.append(net_attributes2['Feature: 0'])
                     cluster_dict1[run_in1] = cluster_list1
             clustering3d(cluster_dict, cluster_dict1)
+        else:
+            null = {}
+            clustering3d(cluster_dict, null)
+
 
     elif use_entirecampaign:
         print('Undivided data used')
         separated_preprocessed_list = [preprocessed_list1]
         run_no = 0
-        cluster_dict = []
+        cluster_dict = {}
         header = ['images', 'second', 'third']
         with open(outputclusterfile, "w", newline='') as dump:
             writer = csv.writer(dump)
@@ -772,13 +784,11 @@ if __name__ == '__main__':
             feature1 = (net_attributes['Feature: 1'])  # these features create the subspace
             feature2 = (net_attributes['Feature: 6'])
             feature3 = (net_attributes['Feature: 0'])
-            run_no = run_no + 1
             with open(outputclusterfile, "a", newline='') as dump:
                 writer = csv.writer(dump)
                 data = [feature1, feature2, feature3]
                 writer.writerow(data)
                 dump.close()
-
     """
     This code has been developed in consultation with Dr Ben Turnbull of the University Of New South Wales, like always, your support is deeply appreciated. 
  """
