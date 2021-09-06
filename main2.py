@@ -31,103 +31,219 @@ from sklearn.model_selection import train_test_split  # Import train_test_split 
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor, ExtraTreesRegressor, \
     GradientBoostingRegressor
 from sklearn import metrics  # Import scikit-learn metrics module for accuracy calculation
-
-
-
+from sklearn.metrics import accuracy_score
+from sklearn.preprocessing import StandardScaler
+from sklearn.neural_network import MLPClassifier
+from sklearn.metrics import plot_confusion_matrix
 from matplotlib import pyplot
+from sklearn.preprocessing import StandardScaler
+from sklearn.neural_network import MLPClassifier
+from sklearn.metrics import plot_confusion_matrix
+from matplotlib import pyplot
+from sklearn.model_selection import GridSearchCV
+from sklearn.metrics import classification_report
 
 """These inputs will change the output of the script, also needs to be tailored to the datasets being used"""
-network_identifier = 'balakot'
-dataset1type = 'TweetBinder'
-dataset2type = 'TweetBinder'
-use_entirecampaign = True
-use_time = False
-use_rows = False
-use_hashtags = False
-use_2_datasets = False
-no_of_rows_per_run = 500 #used to divide the main campaign
-no_of_tweets_per_hashtag = 1000
+network_identifier = 'Nintendo'
+dataset1type = 'Nintendo' #this determines what reader preprocesses the data. 'Tweetbinder', 'Nintendo', 'other'
+dataset2type = 'Nintendo' #this determines what reader preprocesses the data. 'Tweetbinder', 'Nintendo', 'other'
+dataset3type = 'TweetBinder' #this determines what reader preprocesses the data. 'Tweetbinder', 'Nintendo', 'other'
+use_entirecampaign = True #if True, all other switches must be false, runs entire dataset and outputs 1 CNA
+use_time = False # Only if above is False, if True, can either time divide or runs dataset via time block - Must change time delta as well.
+use_rows = False # if true, runs dataset in smaller blocks sequentially and provide a CNA for each block, must change no_of_rows_per_run accordinly.
+use_hashtags = True #if true, will pull out each hashtag and generate a CNA for each hashtag within dataset
+use_2_datasets = True #if true, will run two datasets either via row, hashtag or time, and plot the CNAs on scatter plot with clustering
+use_3_datasets = False #if true, will run three datasets - IMPORTANT - use_2_datasets must also be true. Only working for hashtag and Rows
+scatter2D = False # if true, will plot the two CNAs against whatever subspace has been identified.
+plot3d = False # if true, will plot in 3d after linear regression
+classify = True #use the NN classifier to determine the types of campaigns
+no_of_rows_per_run = 1000 #used to divide the main campaign
+no_of_tweets_per_hashtag = 100 #defines the minimum number of tweets that can generate a hashtag - data division becomes important for model training in LR / IC function
 time_delta = 3600 #in seconds (unix , 3600 = 1 hour, 86400 = day)
-
+K = 2 # number of campaigns being clustered
+campaigntype1 = 'Nintendo' #first dataset type of campaign (political, entertainment, culture, etc)
+campaigntype2 = 'Champions' #Second dataset type of campaign (political, entertainment, culture, etc)
+campaigntype3 = 'AltBalakot' #Third dataset type of campaign (political, entertainment, culture, etc)
 cumulativeevent = 0
 cumulativeimg = 0
 cumulativelink = 0
 cumulativehash = 0
-eventcount = 0
+eventcounter = 0
 lastdate = []
 data = []
-def preprocess_to_list_nonTweetBinder(input_json):
+
+def preprocess_to_list_Nintendo(input_json):
     retdata = []
+    limit = []
+    eventcounter = 0
     for i in input_json:
-        mentions = []
-        hashtags = []
-        urllist = []
-        createdAt = i['created_at']
-        url = i['entities']['urls']
-        retweeted = i['retweeted']
-        text = i['text']
-        textlength = len(text)
-        followers = i['user']['followers_count']
-        following = i['user']['friends_count']
-        mentionlist = i['entities']['user_mentions']
-        hashtaglist = i['entities']['hashtags']
-        favoritecount = i['favorite_count']
+        exculsion = len(i)
+        if exculsion > 1:
+            eventcounter = eventcounter + 1
+            mentions = []
+            hashtaglist = []
+            urllist = []
+            createdAt = i['created_at']
+            # url = i['entities']['urls'] #only needed if using the URL links for analysis
+            # print(url)
+            retweeted = i['retweeted']
+            # print(retweeted)
+            text = i['text']
+            # print(text)
+            textlength = len(text)
+            # print(textlength)
+            followers = i['user']['followers_count']
+            # print(followers)
+            user = i['user']['screen_name']
+            # print(user)
+            following = i['user']['friends_count']
+            # print(following)
+            hashtagrepo = i['entities']['hashtags']
+            for h in hashtagrepo:
+                hashtaglist.append(h['text'])
+            # print(hashtaglist)
+            replycount = i['reply_count']
+            # print(replycount)
+            retweetcount = i['retweet_count']
+            # print(retweetcount)
+            favorites = i['favorite_count']
+            try:
+                mentionlist = i['entities']['user_mentions']
+            except:
+                mentionlist = []
+            # print(mentionlist)
+            try:
+                ftFration = (followers / following)
+            except:
+                ftFration = 0
+            try:
+                normalisedfavourites = (favoritecount / followers)
+            except:
+                normalisedfavourites = 0
 
-        if mentionlist:
-            for m in mentionlist:
-                mentions.append(m['screen_name'])
-        if hashtaglist:
-            for h in hashtaglist:
-                hashtags.append(h['text'])
-        if url:
-            for u in url:
-                urllist.append(u)
-        try:
-            ftFration = (followers / following)
-        except:
-            ftFration = 0
-        try:
-            normalisedfavourites = (favoritecount / followers)
-        except:
-            normalisedfavourites = 0
+            try:
+                normalisedmentions = (mentions / followers)
+            except:
+                normalisedmentions = 0
+            try:
+                normalisedlinks = (len(urllist) / followers)
+            except:
+                normalisedlinks = 0
+            try:
+                normalisedHashtags = (len(hashtags) / followers)
+            except:
+                normalisedHashtags = 0
+            try:
+                normalisedRetweets = (retweeted / followers)
+            except:
+                normalisedRetweets = 0
+            normalisedimages = 0
+            normalisedReplies = 0
+            sentiment = 0
+            originals = 0
+            publicationscore = 0
+            userValue = 0
+            tweetValue = 0
+            lists = 0
+            statuses = 0
+            value = 0
+            actualhashtags = 0
 
-        try:
-            normalisedmentions = (mentions / followers)
-        except:
-            normalisedmentions = 0
-        try:
-            normalisedlinks = (len(urllist) / followers)
-        except:
-            normalisedlinks = 0
-        try:
-            normalisedHashtags = (len(hashtags) / followers)
-        except:
-            normalisedHashtags = 0
-        try:
-            normalisedRetweets = (retweeted / followers)
-        except:
-            normalisedRetweets = 0
-        normalisedimages = 0
-        normalisedReplies = 0
-        sentiment = 0
-        originals = 0
-        publicationscore = 0
-        userValue = 0
-        tweetValue = 0
-        lists = 0
-        statuses = 0
-        value = 0
-        actualhashtags = 0
-
-        constructed_list = [textlength, normalisedfavourites, normalisedimages, normalisedmentions, normalisedlinks,
-                            normalisedHashtags, normalisedRetweets, normalisedReplies, sentiment, originals,
-                            publicationscore,
-                            userValue, tweetValue, lists, statuses, value, hashtags, createdAt]
-        print(constructed_list)
-        retdata.append(constructed_list)
-    #print('this is retdata', retdata)
+            constructed_list = [textlength, normalisedfavourites, normalisedimages, normalisedmentions, normalisedlinks,
+                                normalisedHashtags, normalisedRetweets, normalisedReplies, sentiment, originals,
+                                publicationscore,
+                                userValue, tweetValue, lists, statuses, value, hashtaglist, createdAt]
+            # print(constructed_list)
+            retdata.append(constructed_list)
+        # print('this is retdata', retdata)
     return retdata
 
+def preprocess_to_list_nonTweetBinder(input_json):
+    retdata = []
+    limit = []
+    eventcounter = 0
+    for i in input_json:
+        exculsion = len(i)
+        if exculsion > 1:
+            print(i)
+            eventcounter = eventcounter + 1
+            mentions = []
+            hashtaglist = []
+            urllist = []
+            createdAt = i['created_at']
+            #url = i['user']['url'] #only needed if using the URL links for analysis
+            # print(url)
+            retweeted = i['retweetedTweet']
+            # print(retweeted)
+            text = i['text']
+            # print(text)
+            textlength = len(text)
+            # print(textlength)
+            followers = i['user']['followers_count']
+            # print(followers)
+            user = i['user']['screen_name']
+            # print(user)
+            following = i['user']['friendsCount']
+            # print(following)
+            #hashtagrepo = i['entities']['hashtags']
+            #for h in hashtagrepo:
+                #hashtaglist.append(h['text'])
+            # print(hashtaglist)
+            replycount = i['replyCount']
+            # print(replycount)
+            retweetcount = i['retweetCount']
+            # print(retweetcount)
+            favorites = i['likeCount']
+            try:
+                mentionlist = i['mentionedUsers']
+            except:
+                mentionlist = []
+            # print(mentionlist)
+            try:
+                ftFration = (followers / following)
+            except:
+                ftFration = 0
+            try:
+                normalisedfavourites = (favoritecount / followers)
+            except:
+                normalisedfavourites = 0
+
+            try:
+                normalisedmentions = (mentions / followers)
+            except:
+                normalisedmentions = 0
+            try:
+                normalisedlinks = (len(urllist) / followers)
+            except:
+                normalisedlinks = 0
+            try:
+                normalisedHashtags = (len(hashtags) / followers)
+            except:
+                normalisedHashtags = 0
+            try:
+                normalisedRetweets = (retweeted / followers)
+            except:
+                normalisedRetweets = 0
+            normalisedimages = 0
+            normalisedReplies = 0
+            sentiment = 0
+            originals = 0
+            publicationscore = 0
+            userValue = 0
+            tweetValue = 0
+            lists = 0
+            statuses = 0
+            value = 0
+            actualhashtags = 0
+
+            constructed_list = [textlength, normalisedfavourites, normalisedimages, normalisedmentions, normalisedlinks,
+                                normalisedHashtags, normalisedRetweets, normalisedReplies, sentiment, originals,
+                                publicationscore,
+                                userValue, tweetValue, lists, statuses, value, hashtaglist, createdAt]
+            # print(constructed_list)
+            retdata.append(constructed_list)
+        # print('this is retdata', retdata)
+    return retdata
 def preprocess_to_list_tweetbinderonly(input_json):
     """
     Authors:
@@ -202,7 +318,6 @@ def preprocess_to_list_tweetbinderonly(input_json):
         constructed_list = [textlength, normalisedfavourites, normalisedimages, normalisedmentions, normalisedlinks, normalisedHashtags, normalisedRetweets, normalisedReplies, sentiment, originals, publicationscore,
                     userValue, tweetValue, lists, statuses, value, actualhashtags, createdAt]
         retdata.append(constructed_list)
-    print('this is retdata', retdata)
     return retdata
 
 def calc_linear_regression_and_importance_coefficient(network_identifier, in_list):
@@ -239,7 +354,7 @@ def calc_linear_regression_and_importance_coefficient(network_identifier, in_lis
     # define the taget variable
     y = pima.normalisedfavourites
     # Split dataset into training set and test set
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3,
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2,
                                                         random_state=1)  # 70% training and 30% test
     # define the model
     model = LinearRegression()
@@ -319,10 +434,10 @@ def calc_decisiontreeregression_and_importance_coefficient(network_identifier, i
         networkattributes['Feature: %0d' % (i)] = v
 
     # plot feature importance
-    #plt.pyplot.bar([x for x in range(len(importance))], importance)
+    plt.pyplot.bar([x for x in range(len(importance))], importance)
     # Set number of ticks for x-axis
-    #plt.pyplot.xticks(range(len(importance)), feature_cols, rotation='vertical')
-   # plt.pyplot.show()
+    plt.pyplot.xticks(range(len(importance)), feature_cols, rotation='vertical')
+    plt.pyplot.show()
     #pyplot.savefig(f'lr_{network_identifier}.png')
 
     return networkattributes
@@ -380,15 +495,15 @@ def calc_linearRidge_and_importance_coefficient(network_identifier, in_list):
         networkattributes['Feature: %0d' % (i)] = v
 
     # plot feature importance
-    #plt.pyplot.bar([x for x in range(len(importance))], importance)
+    plt.pyplot.bar([x for x in range(len(importance))], importance)
     # Set number of ticks for x-axis
-    #plt.pyplot.xticks(range(len(importance)), feature_cols, rotation='vertical')
-    #plt.pyplot.show()
+    plt.pyplot.xticks(range(len(importance)), feature_cols, rotation='vertical')
+    plt.pyplot.show()
     #pyplot.savefig(f'lr_{network_identifier}.png')
 
     return networkattributes
 
-def clustering3d(data_in1, data_in2):
+def plotting3d(data_in1, data_in2, data_in3):
     """
        Authors:
         - Nathan
@@ -434,8 +549,24 @@ def clustering3d(data_in1, data_in2):
             Z1componet.append(newZ)
             clusters1.append(1)
         B = np.array(list(zip(X1componet, Y1componet, Z1componet, clusters1)))
-        C = np.concatenate((A, B), axis=0)
-        df = pd.DataFrame(C, columns=['Feature1', 'Feature2', 'Feature3', "Cluster"])
+    if use_3_datasets:
+        Z = data_in3
+        X2componet = []
+        Y2componet = []
+        Z2componet = []
+        clusters2 = []
+        PLOT = go.Figure()
+        for i in Z.values():
+            newX = i[0]
+            newY = i[1]
+            newZ = i[2]
+            X2componet.append(newX)
+            Y2componet.append(newY)
+            Z2componet.append(newZ)
+            clusters2.append(1)
+        C = np.array(list(zip(X2componet, Y2componet, Z2componet, clusters2)))
+        D = np.concatenate((A, B, C), axis=0)
+        df = pd.DataFrame(D, columns=['Feature1', 'Feature2', 'Feature3', "Cluster"])
         fig = pyplot.figure()
         ax = fig.add_subplot(111, projection='3d')
         x = np.array(df['Feature1'])
@@ -454,50 +585,79 @@ def clustering3d(data_in1, data_in2):
         ax.scatter(x, y, z, marker="s", c=df["Cluster"], s=40, cmap="RdBu")
         pyplot.show()
 
+def scatter_in_2D(data_in1, data_in2, data_in3):
+    data = pd.read_csv(data_in1)
+    data.head()
+    X = data[["normailisedimages", "userValue"]]
+    data2 = pd.read_csv(data_in2)
+    print(X)
+    data2.head()
+    X2 = data2[["normailisedimages", "userValue"]]
+    print(X2)
+    #Centroids = (X.sample(n=K))
+    pyplot.scatter(X["normailisedimages"], X["userValue"], marker="s", s=80, cmap="black")
+    pyplot.scatter(X2["normailisedimages"], X2["userValue"], marker="s", s=80, cmap="blue")
+    #pyplot.scatter(Centroids["normailisedimages"], Centroids["userValue"], c='red')
+    pyplot.xlabel('Importance of Image')
+    pyplot.ylabel('Twitter generated User Value')
+    pyplot.show()
 
+def AIclassification(data_in1):
+    df = pd.read_csv(data_in1).dropna()
+    print(df['Campaign Type'].value_counts())
+    x = df.drop('Campaign Type', axis=1)
+    y = df['Campaign Type']
+    trainX, testX, trainY, testY = train_test_split(x, y, test_size=0.2, random_state=1)
+    sc = StandardScaler()
+    scaler = sc.fit(trainX)
+    trainX_scaled = scaler.transform(trainX)
+    testX_scaled = scaler.transform(testX)
+    mlp_clf = MLPClassifier(hidden_layer_sizes=(150, 100, 50),
+                            max_iter=300, activation='relu',
+                            solver='adam')
 
-    # define the model
-    #model = DBSCAN()
-    # fit the model
-    #model.fit(A)
-    # assign a cluster to each example
-    #yhat = model.fit_predict(A)
-    #print('this is yhat', yhat)
-    # retrieve unique clusters
-    #clusters = unique(yhat)
-    # create scatter plot for samples from each cluster
-    #for cluster in clusters:
-        # get row indexes for samples with this cluster
-        #row_ix = where(yhat == cluster)
-        # create scatter of these samples
-        #pyplot.scatter(A[row_ix, 0], A[row_ix, 1])
-    # outputs
-    #pyplot.show()
-    #pyplot.savefig(f'cluster_{network_identifier}.png')
+    mlp_clf.fit(trainX_scaled, trainY)
+    y_pred = mlp_clf.predict(testX_scaled)
 
-def plotting3d(data_in):
+    print('Accuracy: {:.2f}'.format(accuracy_score(testY, y_pred)))
 
-    X = data_in
-    Xcomponet = []
-    Ycomponet = []
-    Zcomponet = []
-    listofdatapoints = []
-    for i in X:
-        listofdatapoints.append(i)
-    labels = np.asarray(listofdatapoints)
-    for i in X.values():
-        newX = i[0]
-        newY = i[1]
-        newZ = i[2]
-        Xcomponet.append(newX)
-        Ycomponet.append(newY)
-        Zcomponet.append(newZ)
-        zyxcomponet = zip(Xcomponet, Ycomponet, Zcomponet)
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
-    ax.scatter(Xcomponet, Ycomponet, Zcomponet)
-    plt.title("3D Scatter plot of CNAs for Hashtag networks")
-    plt.show()
+    fig = plot_confusion_matrix(mlp_clf, testX_scaled, testY, display_labels=mlp_clf.classes_)
+    fig.figure_.suptitle("Confusion Matrix for political campaign Dataset")
+    pyplot.show()
+
+    pyplot.plot(mlp_clf.loss_curve_)
+    pyplot.title("Loss Curve", fontsize=14)
+    pyplot.xlabel('Iterations')
+    pyplot.ylabel('Cost')
+    pyplot.show()
+
+    print(classification_report(testY, y_pred))
+
+    from hyperopt import hp, tpe, fmin
+
+    # Single line bayesian optimization of polynomial function
+    best = fmin(fn=lambda x: np.poly1d([1, -2, -28, 28, 12, -26, 100])(x),
+                space=hp.normal('x', 4.9, 0.5), algo=tpe.suggest,
+                max_evals=2000)
+    print(best)
+
+    param_grid = {
+        'hidden_layer_sizes': [(300, 200, 100), (150, 100, 50), (120, 80, 40), (100, 50, 30)],
+        'max_iter': [250, 500, 1000],
+        'activation': ['tanh', 'relu'],
+        'solver': ['sgd', 'adam'],
+        'alpha': [0.0001, 0.05],
+        'learning_rate': ['constant', 'adaptive'],
+    }
+
+    grid = GridSearchCV(mlp_clf, param_grid, n_jobs=-1, cv=5)
+    grid.fit(trainX_scaled, trainY)
+
+    print(grid.best_params_)
+
+    grid_predictions = grid.predict(testX_scaled)
+
+    print('Accuracy: {:.2f}'.format(accuracy_score(testY, grid_predictions)))
 
 def separate_list_by_rows(list_in, no_of_rows):
     '''
@@ -567,7 +727,6 @@ def separate_list_by_time(list_in):
 
 
 def separate_by_hashtags(list_in):
-    print(list_in)
     hashtagtracker = []
     hashtagnetwork = {}
     mainsethashtag = {}
@@ -583,84 +742,87 @@ def separate_by_hashtags(list_in):
 
     for key in hashtagtracker:
         mainsethashtag[key] = hashtagnetwork["%s" % key]
-    #print('this is mainsethashtag - hashtagtracker', mainsethashtag)
     return mainsethashtag
 
-def cluster_results(list_in):
-    """
-          Authors:
-           - Nathan
-          Date: 15 2021 July
-          Aim:
-          Cluster the Campaign Network Attributes generated by the importance assessment in importance coefficient function
-          """
-
-    X, _ = make_classification(n_samples=1000, n_features=2, n_informative=2, n_redundant=0, n_clusters_per_class=1, random_state=0)
-    data = np.array(list_in)
-    # define the model
-    model = DBSCAN()
-    # fit the model
-    model.fit(data)
-    # assign a cluster to each example
-    yhat = model.fit_predict(data)
-    # retrieve unique clusters
-    clusters = unique(yhat)
-    # create scatter plot for samples from each cluster
-    for cluster in clusters:
-        # get row indexes for samples with this cluster
-        row_ix = where(yhat == cluster)
-        # create scatter of these samples
-        pyplot.scatter(X[row_ix, 0], X[row_ix, 1])
-    # outputs
-    pyplot.show()
-    pyplot.savefig(f'cluster_{network_identifier}.png')
-
-# Press the green button in the gutter to run the script.
 if __name__ == '__main__':
-
-    infile1 = "D:/TweetBinder and Other datasets/Twitter Balakot datasets/5dd75c59-233c-47e7-ad25-e493710778fe.json"
-    infile2 = "D:/TweetBinder and Other datasets/Twitter Balakot datasets/41eb23f5-6e0e-4664-8a76-d7aafeadea4b.json"
-    outputclusterfile = "D:/TweetBinder and Other datasets/Twitter Balakot datasets/clusterfile.csv"
-    outputclusterfile2 = "D:/TweetBinder and Other datasets/Twitter Balakot datasets/clusterfile2.csv"
-    timeoutputfile1 = "D:/TweetBinder and Other datasets/Twitter Balakot datasets/timeview.csv"
-    timeoutputfile2 = "D:/TweetBinder and Other datasets/Twitter Balakot datasets/timeview1.csv"
+    #determining the input files and output files for the various types of routines that can be called
+    infile1 = "C:/users/zephy/documents/botdetect/Nintendo_Tweets_Combined.json"
+    if use_2_datasets:
+        infile2 = "C:/users/zephy/documents/botdetect/TweetsChampions.json"
+    if use_3_datasets:
+        infile3 = "D:/Datasets/TweetBinder and Other datasets/Twitter Balakot datasets/7e3c13ed-3333-4d5b-ab70-ebdb583f466d.json"
+    outputclusterfile1 = "D:/Datasets/TweetBinder and Other datasets/Twitter Balakot datasets/clusterfile1.csv"
+    outputclusterfile2 = "D:/Datasets/TweetBinder and Other datasets/Twitter Balakot datasets/clusterfile2.csv"
+    outputclusterfile3 = "D:/Datasets/TweetBinder and Other datasets/Twitter Balakot datasets/clusterfile3.csv"
+    outputclusterfile4 = "D:/Datasets/TweetBinder and Other datasets/Twitter Balakot datasets/clusterfile4.csv"
+    rowoutputfile1 = "D:/Datasets/TweetBinder and Other datasets/Twitter Balakot datasets/rowview1.csv"
+    rowoutputfile2 = "D:/Datasets/TweetBinder and Other datasets/Twitter Balakot datasets/rowview2.csv"
+    rowoutputfile3 = "D:/Datasets/TweetBinder and Other datasets/Twitter Balakot datasets/rowview3.csv"
+    rowoutputfile4 = "D:/Datasets/TweetBinder and Other datasets/Twitter Balakot datasets/rowview4.csv"
     input_json1 = {}
     input_json2 = {}
     separated_preprocessed_list1 = []
     separated_preprocessed_list2 = []
+    separated_preprocessed_list3 = []
     storeattributes1 = []
     storeattributes2 = []
+    storeattributes3 = []
 
     with open(infile1, encoding='utf-8') as JSONfile:
         input_json = json.load(JSONfile)
     if dataset1type == 'TweetBinder':
         preprocessed_list1 = preprocess_to_list_tweetbinderonly(input_json)
-    elif dataset1type != 'TweetBinder':
-        preprocessed_list1 = preprocess_to_list_nonTweetBinder(input_json)
+    elif dataset1type == 'Nintendo':
+        preprocessed_list1 = preprocess_to_list_Nintendo(input_json)
+    else:
+        preprocessed_list1 = preprocess_to_list_nonTweetBinder()
 
-    with open(infile2, encoding='utf-8') as JSONfile:
-        input_json = json.load(JSONfile)
-    if dataset2type == 'TweetBinder':
-        preprocessed_list2 = preprocess_to_list_tweetbinderonly(input_json)
-    elif dataset2type != 'TweetBinder':
-        preprocessed_list2 = preprocess_to_list_nonTweetBinder(input_json)
+    if use_2_datasets:
+        with open(infile2, encoding='utf-8') as JSONfile:
+            input_json = json.load(JSONfile)
+        if dataset2type == 'TweetBinder':
+            preprocessed_list2 = preprocess_to_list_tweetbinderonly(input_json)
+        elif dataset2type == 'Nintendo':
+            preprocessed_list2 = preprocess_to_list_Nintendo(input_json)
+        else:
+            preprocessed_list2 = preprocess_to_list_nonTweetBinder(input_json)
 
-    cluster_dict1 = {}
-    cluster_dict2 = {}
+    if use_3_datasets:
+        with open(infile3, encoding='utf-8') as JSONfile:
+            input_json = json.load(JSONfile)
+        if dataset3type == 'TweetBinder':
+            preprocessed_list3 = preprocess_to_list_tweetbinderonly(input_json)
+        elif dataset3type == 'Nintendo':
+            preprocessed_list3 = preprocess_to_list_Nintendo(input_json)
+        else:
+            preprocessed_list3 = preprocess_to_list_nonTweetBinder(input_json)
+
     feature_cols = ['textlength', 'normailisedimages', 'normalisedmentions', 'normalisedlinks',
                     'normalisedHashtags',
                     'normalisedRetweets', 'normalisedReplies', 'sentiment', 'originals', 'publicationscore',
-                    'userValue', 'tweetValue', 'lists', 'statuses', 'value']
+                    'userValue', 'tweetValue', 'lists', 'statuses', 'value', 'Campaign Type']
     if use_rows:
         print('Data is divided by', no_of_rows_per_run, 'rows')
         if use_2_datasets:
-            print('Clustering two datasets')
+            if use_3_datasets:
+                print('processing three(3) datasets')
+            else:
+                print('processing two(2) datasets')
+        else:
+            print('processing one(1) dataset')
+        print('_-_-_-_-Processing 1st Dataset _-_-_-_-')
         separated_preprocessed_list1 = separate_list_by_rows(preprocessed_list1, no_of_rows_per_run)
         run_no = 0
-        with open(timeoutputfile1, "w", newline='', encoding='utf-8') as dump:
-            writer = csv.writer(dump)
+        cluster_dict1 = {}
+        with open(rowoutputfile4, "w", newline='') as output:
+            writer = csv.writer(output)
             writer.writerow(feature_cols)
         for run_in in separated_preprocessed_list1:
+            if run_no == 0:
+                batchnumber = (0, 'to', no_of_rows_per_run)
+            else:
+                batchnumber = (run_no * no_of_rows_per_run, 'to', (run_no + 1) * no_of_rows_per_run)
+            print('processing', batchnumber)
             timeview1 = []
             net_attributes1 = calc_linear_regression_and_importance_coefficient(f'{network_identifier}_{run_no}',run_in)
             run_no = run_no + 1
@@ -668,15 +830,30 @@ if __name__ == '__main__':
             timeview1.append(net_attributes1['Feature: 6'])
             timeview1.append(net_attributes1['Feature: 0'])
             cluster_dict1[run_no] = timeview1
-            with open(timeoutputfile1, "w", newline='', encoding='utf-8') as dump:
+            with open(rowoutputfile1, "w", newline='', encoding='utf-8') as dump:
                 writer = csv.writer(dump)
                 writer.writerow(net_attributes1.values())
-                dump.close()
+            with open(rowoutputfile1, "r", newline='', encoding='utf-8') as dump,\
+                    open(rowoutputfile4, 'a', newline='') as updateddump:
+                reader = csv.reader(dump)
+                writer = csv.writer(updateddump)
+                for row in reader:
+                    row.append(campaigntype1)
+                    writer.writerow(row)
+            dump.close()
+            updateddump.close()
 
         if use_2_datasets:
+            print('_-_-_-_-Processing 2nd Dataset _-_-_-_-')
+            cluster_dict2 = {}
             separated_preprocessed_list2 = separate_list_by_rows(preprocessed_list2, no_of_rows_per_run)
             run_no = 0
             for run_in in separated_preprocessed_list2:
+                if run_no == 0:
+                    batchnumber = (0, 'to', no_of_rows_per_run)
+                else:
+                    batchnumber = (run_no * no_of_rows_per_run, 'to', (run_no + 1) * no_of_rows_per_run)
+                print('processing', batchnumber)
                 timeview2 = []
                 net_attributes2 = calc_linear_regression_and_importance_coefficient(f'{network_identifier}_{run_no}',
                                                                                     run_in)
@@ -685,32 +862,89 @@ if __name__ == '__main__':
                 timeview2.append(net_attributes2['Feature: 6'])
                 timeview2.append(net_attributes2['Feature: 0'])
                 cluster_dict2[run_no] = timeview2
-                with open(timeoutputfile2, "w", newline='', encoding='utf-8') as dump:
+                with open(rowoutputfile2, "w", newline='', encoding='utf-8') as dump:
                     writer = csv.writer(dump)
                     writer.writerow(net_attributes2.values())
-                    dump.close()
-            print(cluster_dict1, cluster_dict2)
-            clustering3d(cluster_dict1, cluster_dict2)
+                with open(rowoutputfile2, "r", newline='', encoding='utf-8') as dump, \
+                        open(rowoutputfile4, 'a', newline='') as updateddump:
+                    reader = csv.reader(dump)
+                    writer = csv.writer(updateddump)
+                    for row in reader:
+                        row.append(campaigntype2)
+                        writer.writerow(row)
+                dump.close()
+                updateddump.close()
 
-        else:
-            null = {}
-            clustering3d(cluster_dict1, null)
+        if use_3_datasets:
+            print('_-_-_-_-Processing 3rd Dataset _-_-_-_-')
+            cluster_dict3 = {}
+            separated_preprocessed_list3 = separate_list_by_rows(preprocessed_list3, no_of_rows_per_run)
+            run_no = 0
+            for run_in in separated_preprocessed_list3:
+                if run_no == 0:
+                    batchnumber = (0, 'to', no_of_rows_per_run)
+                else:
+                    batchnumber = (run_no * no_of_rows_per_run, 'to', (run_no + 1) * no_of_rows_per_run)
+                print('processing', batchnumber)
+                timeview3 = []
+                net_attributes3 = calc_linear_regression_and_importance_coefficient(f'{network_identifier}_{run_no}',run_in)
+                run_no = run_no + 1
+                timeview3.append(net_attributes3['Feature: 1'])  # these features create the subspace
+                timeview3.append(net_attributes3['Feature: 6'])
+                timeview3.append(net_attributes3['Feature: 0'])
+                cluster_dict3[run_no] = timeview3
+                with open(rowoutputfile3, "w", newline='', encoding='utf-8') as dump:
+                    writer = csv.writer(dump)
+                    writer.writerow(net_attributes3.values())
+                with open(rowoutputfile3, "r", newline='', encoding='utf-8') as dump, \
+                        open(rowoutputfile4, 'a', newline='') as updateddump:
+                    reader = csv.reader(dump)
+                    writer = csv.writer(updateddump)
+                    for row in reader:
+                        row.append(campaigntype3)
+                        writer.writerow(row)
+                dump.close()
+                updateddump.close()
+
+        null = {}
+        if scatter2D:
+            if use_2_datasets:
+                if use_3_datasets:
+                    scatter_in_2D(outputclusterfile1, outputclusterfile2, outputclusterfile3)
+                else:
+                    scatter_in_2D(outputclusterfile1, outputclusterfile2, null)
+            else:
+                scatter_in_2D(outputclusterfile1, null, null)
+        if plot3d:
+            if use_2_datasets:
+                if use_3_datasets:
+                    plotting3d(cluster_dict1, cluster_dict2, cluster_dict3)
+                else:
+                    plotting3d(cluster_dict1, cluster_dict2, null)
+            else:
+                plotting3d(cluster_dict1, null, null)
+        if classify:
+            AIclassification(outputclusterfile4)
 
     elif use_hashtags:
         print('Data separated by', no_of_tweets_per_hashtag, 'hashtags')
         if use_2_datasets:
-            print('Clustering two datasets')
+            if use_3_datasets:
+                print('processing three(3) datasets')
+            else:
+                print('processing two(2) datasets')
+        else:
+            print('processing one(1) dataset')
+        print('_-_-_-_-Processing 1st Dataset _-_-_-_-')
         hashtagtracker = separate_by_hashtags(preprocessed_list1)
         run_no = 0
-        cluster_dict = {}
         cluster_dict1 = {}
-        cluster_dict2 = {}
         feature_cols = ['textlength', 'normailisedimages', 'normalisedmentions', 'normalisedlinks',
                         'normalisedHashtags',
                         'normalisedRetweets', 'normalisedReplies', 'sentiment', 'originals', 'publicationscore',
-                        'userValue', 'tweetValue', 'lists', 'statuses', 'value']
-        with open(outputclusterfile, "w", newline='') as dump:
-            writer = csv.writer(dump)
+                        'userValue', 'tweetValue', 'lists', 'statuses', 'value', 'Campaign Type']
+        with open(outputclusterfile4, "w", newline='') as output:
+            writer = csv.writer(output)
             writer.writerow(feature_cols)
         for run_in1 in hashtagtracker:
             run_in2 = hashtagtracker[run_in1]
@@ -718,77 +952,144 @@ if __name__ == '__main__':
                 run_no = run_no + 1
                 print('running hashtag', run_in1)
                 print(len(run_in2))
-                cluster_list = []
+                cluster_list1 = []
                 net_attributes = calc_linear_regression_and_importance_coefficient(f'{run_in2}_{run_no}', run_in2)
                 # unhash this line for DecisionTree Regression
-                #net_attributes = calc_decisiontreeregression_and_importance_coefficient(f'{run_in2}_{run_no}', run_in2)
+                #net_attributes1 = calc_decisiontreeregression_and_importance_coefficient(f'{run_in2}_{run_no}', run_in2)
                 # unhash this line for Linear Ridge regression
                 #net_attributes2 = calc_linearRidge_and_importance_coefficient(f'{run_in2}_{run_no}', run_in2)
-                cluster_list.append(net_attributes['Feature: 1'])  # these features create the subspace
-                cluster_list.append(net_attributes['Feature: 6'])
-                cluster_list.append(net_attributes['Feature: 0'])
-                cluster_dict[run_in1] = cluster_list
-                with open(outputclusterfile, "a", newline='', encoding='utf-8') as dump:
+                cluster_list1.append(net_attributes['Feature: 1'])  # these features create the subspace
+                cluster_list1.append(net_attributes['Feature: 6'])
+                cluster_list1.append(net_attributes['Feature: 0'])
+                cluster_dict1[run_in1] = cluster_list1
+                with open(outputclusterfile1, "w", newline='', encoding='utf-8') as dump:
                     writer = csv.writer(dump)
                     writer.writerow(net_attributes.values())
-                    dump.close()
+                with open(outputclusterfile1, "r", newline='', encoding='utf-8') as dump, \
+                        open(outputclusterfile4, 'a', newline='') as updateddump:
+                    reader = csv.reader(dump)
+                    writer = csv.writer(updateddump)
+                    for row in reader:
+                            row.append(campaigntype1)
+                            writer.writerow(row)
+                dump.close()
+                updateddump.close()
 
         if use_2_datasets:
-            print('Data separated by Hashtag2')
+            print('_-_-_-_-Processing 2nd Dataset _-_-_-_-')
             hashtagtracker2 = separate_by_hashtags(preprocessed_list2)
             run_no = 0
-            cluster_dict1 = {}
             cluster_dict2 = {}
-            feature_cols = ['textlength', 'normailisedimages', 'normalisedmentions', 'normalisedlinks',
-                        'normalisedHashtags',
-                        'normalisedRetweets', 'normalisedReplies', 'sentiment', 'originals', 'publicationscore',
-                        'userValue', 'tweetValue', 'lists', 'statuses', 'value']
-            with open(outputclusterfile2, "w", newline='') as dump:
-                writer = csv.writer(dump)
-                writer.writerow(feature_cols)
             for run_in1 in hashtagtracker2:
                 run_in2 = hashtagtracker2[run_in1]
                 if len(run_in2) >= no_of_tweets_per_hashtag:  # this number can be fine turned to determine the hashtag network size analysed.
                     run_no = run_no + 1
                     print('running hashtag', run_in1)
                     print(len(run_in2))
-                    cluster_list = []
-                    cluster_list1 = []
                     cluster_list2 = []
                     net_attributes2 = calc_linear_regression_and_importance_coefficient(f'{run_in2}_{run_no}', run_in2)
                 #    unhash this line for DecisionTree Regression
                 # net_attributes = calc_decisiontreeregression_and_importance_coefficient(f'{run_in2}_{run_no}', run_in2)
                 # unhash this line for Linear Ridge regression
                 # net_attributes2 = calc_linearRidge_and_importance_coefficient(f'{run_in2}_{run_no}', run_in2)
-                    cluster_list1.append(net_attributes2['Feature: 1'])  # these features create the subspace
-                    cluster_list1.append(net_attributes2['Feature: 6'])
-                    cluster_list1.append(net_attributes2['Feature: 0'])
-                    cluster_dict1[run_in1] = cluster_list1
-            clustering3d(cluster_dict, cluster_dict1)
-        else:
-            null = {}
-            clustering3d(cluster_dict, null)
+                    cluster_list2.append(net_attributes2['Feature: 1'])  # these features create the subspace
+                    cluster_list2.append(net_attributes2['Feature: 6'])
+                    cluster_list2.append(net_attributes2['Feature: 0'])
+                    cluster_dict2[run_in1] = cluster_list2
+                    with open(outputclusterfile2, "w", newline='', encoding='utf-8') as dump:
+                        writer = csv.writer(dump)
+                        writer.writerow(net_attributes2.values())
+                    with open(outputclusterfile2, "r", newline='', encoding='utf-8') as dump, \
+                            open(outputclusterfile4, 'a', newline='') as updateddump:
+                        reader = csv.reader(dump)
+                        writer = csv.writer(updateddump)
+                        for row in reader:
+                            row.append(campaigntype2)
+                            writer.writerow(row)
+                dump.close()
+                updateddump.close()
 
+        if use_3_datasets:
+            print('_-_-_-_-Processing 3rd Dataset _-_-_-_-')
+            hashtagtracker3 = separate_by_hashtags(preprocessed_list3)
+            run_no = 0
+            cluster_dict3 = {}
+            for run_in1 in hashtagtracker3:
+                run_in2 = hashtagtracker3[run_in1]
+                if len(run_in2) >= no_of_tweets_per_hashtag:  # this number can be fine turned to determine the hashtag network size analysed.
+                    run_no = run_no + 1
+                    print('running hashtag', run_in1)
+                    print(len(run_in2))
+                    cluster_list3 = []
+                    net_attributes3 = calc_linear_regression_and_importance_coefficient(f'{run_in2}_{run_no}', run_in2)
+                #    unhash this line for DecisionTree Regression
+                # net_attributes = calc_decisiontreeregression_and_importance_coefficient(f'{run_in2}_{run_no}', run_in2)
+                # unhash this line for Linear Ridge regression
+                # net_attributes2 = calc_linearRidge_and_importance_coefficient(f'{run_in2}_{run_no}', run_in2)
+                    cluster_list3.append(net_attributes3['Feature: 1'])  # these features create the subspace
+                    cluster_list3.append(net_attributes3['Feature: 6'])
+                    cluster_list3.append(net_attributes3['Feature: 0'])
+                    cluster_dict3[run_in1] = cluster_list3
+                    with open(outputclusterfile3, "w", newline='', encoding='utf-8') as dump:
+                        writer = csv.writer(dump)
+                        writer.writerow(net_attributes3.values())
+                    with open(outputclusterfile3, "r", newline='', encoding='utf-8') as dump, \
+                            open(outputclusterfile4, 'a', newline='') as updateddump:
+                        reader = csv.reader(dump)
+                        writer = csv.writer(updateddump)
+                        for row in reader:
+                            row.append(campaigntype3)
+                            writer.writerow(row)
+                dump.close()
+                updateddump.close()
+        null = {}
+        if scatter2D:
+            if use_2_datasets:
+                if use_3_datasets:
+                    scatter_in_2D(outputclusterfile1, outputclusterfile2, outputclusterfile3)
+                else:
+                    scatter_in_2D(outputclusterfile1, outputclusterfile2, null)
+            else:
+                scatter_in_2D(outputclusterfile1, null, null)
+        if plot3d:
+            if use_2_datasets:
+                if use_3_datasets:
+                    plotting3d(cluster_dict1, cluster_dict2, cluster_dict3)
+                else:
+                    plotting3d(cluster_dict1, cluster_dict2, null)
+            else:
+                plotting3d(cluster_dict1, null, null)
+        if classify:
+            AIclassification(outputclusterfile4)
 
     elif use_entirecampaign:
-        print('Undivided data used')
-        separated_preprocessed_list = [preprocessed_list1]
+        print('dataset undivided')
         run_no = 0
-        cluster_dict = {}
-        header = ['images', 'second', 'third']
-        with open(outputclusterfile, "w", newline='') as dump:
+        cluster_dict1 = {}
+        header = ['textlength', 'normailisedimages', 'normalisedmentions', 'normalisedlinks',
+                        'normalisedHashtags',
+                        'normalisedRetweets', 'normalisedReplies', 'sentiment', 'originals', 'publicationscore',
+                        'userValue', 'tweetValue', 'lists', 'statuses', 'value', 'Campaign Type']
+        with open(outputclusterfile1, "w", newline='') as dump:
             writer = csv.writer(dump)
             writer.writerow(header)
-        for run_in1 in separated_preprocessed_list:
-            net_attributes = calc_linear_regression_and_importance_coefficient(f'{run_in1}_{run_no}', run_in1)
-            feature1 = (net_attributes['Feature: 1'])  # these features create the subspace
-            feature2 = (net_attributes['Feature: 6'])
-            feature3 = (net_attributes['Feature: 0'])
-            with open(outputclusterfile, "a", newline='') as dump:
+        for run_in1 in preprocessed_list1:
+            run_no = run_no + 1
+            cluster_list1 = []
+            net_attributes1 = calc_linear_regression_and_importance_coefficient(f'{run_in1}_{run_no}', run_in1)
+            cluster_list1.append(net_attributes1['Feature: 1'])  # these features create the subspace
+            cluster_list1.append(net_attributes1['Feature: 6'])
+            cluster_list1.append(net_attributes1['Feature: 0'])
+            cluster_dict1[run_no] = cluster_list1
+            with open(outputclusterfile1, "a", newline='') as dump:
                 writer = csv.writer(dump)
-                data = [feature1, feature2, feature3]
-                writer.writerow(data)
+                writer.writerow(net_attributes1.values())
                 dump.close()
+        null = {}
+        #if scatter2D:
+            #scatter_in_2D(cluster_dict1, null)
+        #if plot3d:
+            #plotting3d(net_attributes1, null)
     """
     This code has been developed in consultation with Dr Ben Turnbull of the University Of New South Wales, like always, your support is deeply appreciated. 
  """
