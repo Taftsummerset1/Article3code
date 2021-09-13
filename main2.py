@@ -43,7 +43,14 @@ from matplotlib import pyplot
 from sklearn.model_selection import GridSearchCV
 from sklearn.metrics import classification_report
 
-"""These inputs will change the output of the script, also needs to be tailored to the datasets being used"""
+"""These inputs will change the output of the script, also needs to be tailored to the datasets being used
+
+---IMPORTANT--- 
+
+This paramaters must be set correctly for the dataset type and number to produce the correct graphs, plots and confusion matrix
+
+Each value and dataset-type will change the functions and type of process used
+"""
 network_identifier = 'Nintendo'
 dataset1type = 'Nintendo' #this determines what reader preprocesses the data. 'Tweetbinder', 'Nintendo', 'other'
 dataset2type = 'Nintendo' #this determines what reader preprocesses the data. 'Tweetbinder', 'Nintendo', 'other'
@@ -52,18 +59,21 @@ use_entirecampaign = True #if True, all other switches must be false, runs entir
 use_time = False # Only if above is False, if True, can either time divide or runs dataset via time block - Must change time delta as well.
 use_rows = False # if true, runs dataset in smaller blocks sequentially and provide a CNA for each block, must change no_of_rows_per_run accordinly.
 use_hashtags = True #if true, will pull out each hashtag and generate a CNA for each hashtag within dataset
-use_2_datasets = True #if true, will run two datasets either via row, hashtag or time, and plot the CNAs on scatter plot with clustering
+use_2_datasets = False #if true, will run two datasets either via row, hashtag or time, and plot the CNAs on scatter plot with clustering
 use_3_datasets = False #if true, will run three datasets - IMPORTANT - use_2_datasets must also be true. Only working for hashtag and Rows
 scatter2D = False # if true, will plot the two CNAs against whatever subspace has been identified.
 plot3d = False # if true, will plot in 3d after linear regression
 classify = True #use the NN classifier to determine the types of campaigns
 no_of_rows_per_run = 1000 #used to divide the main campaign
-no_of_tweets_per_hashtag = 100 #defines the minimum number of tweets that can generate a hashtag - data division becomes important for model training in LR / IC function
+no_of_tweets_per_hashtag = 1000 #defines the minimum number of tweets that can generate a hashtag - data division becomes important for model training in LR / IC function
 time_delta = 3600 #in seconds (unix , 3600 = 1 hour, 86400 = day)
 K = 2 # number of campaigns being clustered
-campaigntype1 = 'Nintendo' #first dataset type of campaign (political, entertainment, culture, etc)
+""" These parameters do not effect processing """
+campaigntype1 = 'Nintendo' #first dataset name / type of campaign (political, entertainment, culture, etc)
 campaigntype2 = 'Champions' #Second dataset type of campaign (political, entertainment, culture, etc)
 campaigntype3 = 'AltBalakot' #Third dataset type of campaign (political, entertainment, culture, etc)
+
+""" These preset values will impact preprocessing only """
 cumulativeevent = 0
 cumulativeimg = 0
 cumulativelink = 0
@@ -78,40 +88,35 @@ def preprocess_to_list_Nintendo(input_json):
     eventcounter = 0
     for i in input_json:
         exculsion = len(i)
-        if exculsion > 1:
+        if eventcounter < 2:
             eventcounter = eventcounter + 1
             mentions = []
             hashtaglist = []
-            urllist = []
+            url = []
             createdAt = i['created_at']
-            # url = i['entities']['urls'] #only needed if using the URL links for analysis
-            # print(url)
+            urllist = i['entities']['urls'] #only needed if using the URL links for analysis
+            for u in urllist:
+                url.append(u['url'])
             retweeted = i['retweeted']
-            # print(retweeted)
             text = i['text']
-            # print(text)
+            print('text', text)
             textlength = len(text)
-            # print(textlength)
             followers = i['user']['followers_count']
-            # print(followers)
+            print('followers', followers)
             user = i['user']['screen_name']
-            # print(user)
             following = i['user']['friends_count']
-            # print(following)
             hashtagrepo = i['entities']['hashtags']
             for h in hashtagrepo:
                 hashtaglist.append(h['text'])
-            # print(hashtaglist)
             replycount = i['reply_count']
-            # print(replycount)
+            print('reply count', replycount)
             retweetcount = i['retweet_count']
-            # print(retweetcount)
+            print('retweet count', retweetcount)
             favorites = i['favorite_count']
-            try:
-                mentionlist = i['entities']['user_mentions']
-            except:
-                mentionlist = []
-            # print(mentionlist)
+            print('favorite count', favorites)
+            mentionlist = i['entities']['user_mentions']
+            for m in mentionlist:
+                mentions.append(m['name'])
             try:
                 ftFration = (followers / following)
             except:
@@ -120,17 +125,17 @@ def preprocess_to_list_Nintendo(input_json):
                 normalisedfavourites = (favoritecount / followers)
             except:
                 normalisedfavourites = 0
-
+            print('thi si normalised fav', normalisedfavourites)
             try:
-                normalisedmentions = (mentions / followers)
+                normalisedmentions = (len(mentions) / followers)
             except:
                 normalisedmentions = 0
             try:
-                normalisedlinks = (len(urllist) / followers)
+                normalisedlinks = (len(url) / followers)
             except:
                 normalisedlinks = 0
             try:
-                normalisedHashtags = (len(hashtags) / followers)
+                normalisedHashtags = (len(hashtaglist) / followers)
             except:
                 normalisedHashtags = 0
             try:
@@ -149,11 +154,95 @@ def preprocess_to_list_Nintendo(input_json):
             value = 0
             actualhashtags = 0
 
-            constructed_list = [textlength, normalisedfavourites, normalisedimages, normalisedmentions, normalisedlinks,
+            constructed_list = [textlength, normalisedfavourites, normalisedimages, normalisedmentions,
+                                normalisedlinks,
                                 normalisedHashtags, normalisedRetweets, normalisedReplies, sentiment, originals,
                                 publicationscore,
                                 userValue, tweetValue, lists, statuses, value, hashtaglist, createdAt]
-            # print(constructed_list)
+            print(constructed_list)
+            retdata.append(constructed_list)
+        # print('this is retdata', retdata)
+    return retdata
+
+
+def preprocess_to_list_Eurovision4(input_json):
+    retdata = []
+    limit = []
+    eventcounter = 0
+    for i in input_json:
+        exculsion = len(i)
+        if eventcounter < 2:
+            eventcounter = eventcounter + 1
+            mentions = []
+            hashtaglist = []
+            url = []
+            createdAt = i['created_at']
+            urllist = i['entities']['urls'] #only needed if using the URL links for analysis
+            for u in urllist:
+                url.append(u['url'])
+            retweeted = i['retweeted']
+            text = i['text']
+            print('text', text)
+            textlength = len(text)
+            followers = i['user']['followers_count']
+            print('followers', followers)
+            user = i['user']['screen_name']
+            following = i['user']['friends_count']
+            hashtagrepo = i['entities']['hashtags']
+            for h in hashtagrepo:
+                hashtaglist.append(h['text'])
+            replycount = i['reply_count']
+            print('reply count', replycount)
+            retweetcount = i['retweet_count']
+            print('retweet count', retweetcount)
+            favorites = i['favorite_count']
+            print('favorite count', favorites)
+            mentionlist = i['entities']['user_mentions']
+            for m in mentionlist:
+                mentions.append(m['name'])
+            try:
+                ftFration = (followers / following)
+            except:
+                ftFration = 0
+            try:
+                normalisedfavourites = (favoritecount / followers)
+            except:
+                normalisedfavourites = 0
+            print('thi si normalised fav', normalisedfavourites)
+            try:
+                normalisedmentions = (len(mentions) / followers)
+            except:
+                normalisedmentions = 0
+            try:
+                normalisedlinks = (len(url) / followers)
+            except:
+                normalisedlinks = 0
+            try:
+                normalisedHashtags = (len(hashtaglist) / followers)
+            except:
+                normalisedHashtags = 0
+            try:
+                normalisedRetweets = (retweeted / followers)
+            except:
+                normalisedRetweets = 0
+            normalisedimages = 0
+            normalisedReplies = 0
+            sentiment = 0
+            originals = 0
+            publicationscore = 0
+            userValue = 0
+            tweetValue = 0
+            lists = 0
+            statuses = 0
+            value = 0
+            actualhashtags = 0
+
+            constructed_list = [textlength, normalisedfavourites, normalisedimages, normalisedmentions,
+                                normalisedlinks,
+                                normalisedHashtags, normalisedRetweets, normalisedReplies, sentiment, originals,
+                                publicationscore,
+                                userValue, tweetValue, lists, statuses, value, hashtaglist, createdAt]
+            print(constructed_list)
             retdata.append(constructed_list)
         # print('this is retdata', retdata)
     return retdata
@@ -774,6 +863,8 @@ if __name__ == '__main__':
         preprocessed_list1 = preprocess_to_list_tweetbinderonly(input_json)
     elif dataset1type == 'Nintendo':
         preprocessed_list1 = preprocess_to_list_Nintendo(input_json)
+    elif dataset1type == 'Eurovision4'
+        preprocessed_list1 = preprocess_to_list_Eurovision4(input_json)
     else:
         preprocessed_list1 = preprocess_to_list_nonTweetBinder()
 
@@ -784,6 +875,8 @@ if __name__ == '__main__':
             preprocessed_list2 = preprocess_to_list_tweetbinderonly(input_json)
         elif dataset2type == 'Nintendo':
             preprocessed_list2 = preprocess_to_list_Nintendo(input_json)
+        elif dataset2type == 'Eurovision4'
+            preprocessed_list1 = preprocess_to_list_Eurovision4(input_json)
         else:
             preprocessed_list2 = preprocess_to_list_nonTweetBinder(input_json)
 
@@ -794,6 +887,8 @@ if __name__ == '__main__':
             preprocessed_list3 = preprocess_to_list_tweetbinderonly(input_json)
         elif dataset3type == 'Nintendo':
             preprocessed_list3 = preprocess_to_list_Nintendo(input_json)
+        elif dataset3type == 'Eurovision4'
+            preprocessed_list1 = preprocess_to_list_Eurovision4(input_json)
         else:
             preprocessed_list3 = preprocess_to_list_nonTweetBinder(input_json)
 
