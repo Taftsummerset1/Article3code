@@ -52,26 +52,26 @@ This paramaters must be set correctly for the dataset type and number to produce
 Each value and dataset-type will change the functions and type of process used
 """
 network_identifier = 'Nintendo'
-dataset1type = 'Nintendo' #this determines what reader preprocesses the data. 'Tweetbinder', 'Nintendo', 'other'
-dataset2type = 'Nintendo' #this determines what reader preprocesses the data. 'Tweetbinder', 'Nintendo', 'other'
-dataset3type = 'TweetBinder' #this determines what reader preprocesses the data. 'Tweetbinder', 'Nintendo', 'other'
+dataset1type = 'Pakelection' #this determines what reader preprocesses the data. Options are 'Tweetbinder', 'Nintendo', 'Eurovision4', 'Pakelect'
+dataset2type = 'TweetBinder' #this determines what reader preprocesses the data. Options are 'Tweetbinder', 'Nintendo', 'Eurovision4', 'Pakelect'
+dataset3type = 'TweetBinder' #this determines what reader preprocesses the data. Options are 'Tweetbinder', 'Nintendo', 'Eurovision4', 'Pakelect'
 use_entirecampaign = True #if True, all other switches must be false, runs entire dataset and outputs 1 CNA
 use_time = False # Only if above is False, if True, can either time divide or runs dataset via time block - Must change time delta as well.
 use_rows = False # if true, runs dataset in smaller blocks sequentially and provide a CNA for each block, must change no_of_rows_per_run accordinly.
 use_hashtags = True #if true, will pull out each hashtag and generate a CNA for each hashtag within dataset
-use_2_datasets = False #if true, will run two datasets either via row, hashtag or time, and plot the CNAs on scatter plot with clustering
-use_3_datasets = False #if true, will run three datasets - IMPORTANT - use_2_datasets must also be true. Only working for hashtag and Rows
+use_2_datasets = True #if true, will run two datasets either via row, hashtag or time, and plot the CNAs on scatter plot with clustering
+use_3_datasets = True #if true, will run three datasets - IMPORTANT - use_2_datasets must also be true. Only working for hashtag and Rows
 scatter2D = False # if true, will plot the two CNAs against whatever subspace has been identified.
 plot3d = False # if true, will plot in 3d after linear regression
 classify = True #use the NN classifier to determine the types of campaigns
-no_of_rows_per_run = 1000 #used to divide the main campaign
-no_of_tweets_per_hashtag = 1000 #defines the minimum number of tweets that can generate a hashtag - data division becomes important for model training in LR / IC function
+no_of_rows_per_run = 10 #used to divide the main campaign
+no_of_tweets_per_hashtag = 50 #defines the minimum number of tweets that can generate a hashtag - data division becomes important for model training in LR / IC function
 time_delta = 3600 #in seconds (unix , 3600 = 1 hour, 86400 = day)
 K = 2 # number of campaigns being clustered
 """ These parameters do not effect processing """
-campaigntype1 = 'Nintendo' #first dataset name / type of campaign (political, entertainment, culture, etc)
-campaigntype2 = 'Champions' #Second dataset type of campaign (political, entertainment, culture, etc)
-campaigntype3 = 'AltBalakot' #Third dataset type of campaign (political, entertainment, culture, etc)
+campaigntype1 = 'Political' #first dataset name / type of campaign (political, entertainment, culture, etc)
+campaigntype2 = 'Conflict1' #Second dataset type of campaign (political, entertainment, culture, etc)
+campaigntype3 = 'Conflict2' #Third dataset type of campaign (political, entertainment, culture, etc)
 
 """ These preset values will impact preprocessing only """
 cumulativeevent = 0
@@ -82,39 +82,40 @@ eventcounter = 0
 lastdate = []
 data = []
 
-def preprocess_to_list_Nintendo(input_json):
+def preprocess_to_list_Nintendo_and_Eurovision(input_json):
     retdata = []
-    limit = []
-    eventcounter = 0
     for i in input_json:
         exculsion = len(i)
-        if eventcounter < 2:
-            eventcounter = eventcounter + 1
+        if exculsion > 10:
             mentions = []
             hashtaglist = []
             url = []
             createdAt = i['created_at']
-            urllist = i['entities']['urls'] #only needed if using the URL links for analysis
+            #images = i['images']
+            urllist = i['entities']['urls']
             for u in urllist:
                 url.append(u['url'])
             retweeted = i['retweeted']
             text = i['text']
-            print('text', text)
             textlength = len(text)
             followers = i['user']['followers_count']
-            print('followers', followers)
             user = i['user']['screen_name']
             following = i['user']['friends_count']
             hashtagrepo = i['entities']['hashtags']
             for h in hashtagrepo:
                 hashtaglist.append(h['text'])
             replycount = i['reply_count']
-            print('reply count', replycount)
             retweetcount = i['retweet_count']
-            print('retweet count', retweetcount)
             favorites = i['favorite_count']
-            print('favorite count', favorites)
             mentionlist = i['entities']['user_mentions']
+            try:
+                statuses = i['statuses_count']
+            except:
+                statuses = 0
+            try:
+                lists = i['listed_count']
+            except:
+                lists = 0
             for m in mentionlist:
                 mentions.append(m['name'])
             try:
@@ -125,7 +126,6 @@ def preprocess_to_list_Nintendo(input_json):
                 normalisedfavourites = (favoritecount / followers)
             except:
                 normalisedfavourites = 0
-            print('thi si normalised fav', normalisedfavourites)
             try:
                 normalisedmentions = (len(mentions) / followers)
             except:
@@ -139,18 +139,19 @@ def preprocess_to_list_Nintendo(input_json):
             except:
                 normalisedHashtags = 0
             try:
-                normalisedRetweets = (retweeted / followers)
+                normalisedRetweets = (retweetcount / followers)
             except:
                 normalisedRetweets = 0
+            try:
+                normalisedReplies = (replycount / followers)
+            except:
+                normalisedReplies = 0
             normalisedimages = 0
-            normalisedReplies = 0
             sentiment = 0
             originals = 0
             publicationscore = 0
             userValue = 0
             tweetValue = 0
-            lists = 0
-            statuses = 0
             value = 0
             actualhashtags = 0
 
@@ -159,45 +160,43 @@ def preprocess_to_list_Nintendo(input_json):
                                 normalisedHashtags, normalisedRetweets, normalisedReplies, sentiment, originals,
                                 publicationscore,
                                 userValue, tweetValue, lists, statuses, value, hashtaglist, createdAt]
-            print(constructed_list)
             retdata.append(constructed_list)
-        # print('this is retdata', retdata)
+            #TODO must make the feature lists from all datasets consistent otherwise, this will skew the confusion / AI results.
     return retdata
 
-
-def preprocess_to_list_Eurovision4(input_json):
+def preprocess_to_list_Pakelect(input_json):
     retdata = []
-    limit = []
-    eventcounter = 0
     for i in input_json:
         exculsion = len(i)
-        if eventcounter < 2:
-            eventcounter = eventcounter + 1
+        if exculsion > 10:
             mentions = []
             hashtaglist = []
             url = []
             createdAt = i['created_at']
-            urllist = i['entities']['urls'] #only needed if using the URL links for analysis
+            #images = i['images']
+            urllist = i['entities']['urls']
             for u in urllist:
                 url.append(u['url'])
             retweeted = i['retweeted']
             text = i['text']
-            print('text', text)
             textlength = len(text)
             followers = i['user']['followers_count']
-            print('followers', followers)
             user = i['user']['screen_name']
             following = i['user']['friends_count']
             hashtagrepo = i['entities']['hashtags']
             for h in hashtagrepo:
                 hashtaglist.append(h['text'])
-            replycount = i['reply_count']
-            print('reply count', replycount)
             retweetcount = i['retweet_count']
-            print('retweet count', retweetcount)
             favorites = i['favorite_count']
-            print('favorite count', favorites)
-            mentionlist = i['entities']['user_mentions']
+            mentionlist =  i['entities']['user_mentions']
+            try:
+                statuses = i['statuses_count']
+            except:
+                statuses = 0
+            try:
+                lists = i['listed_count']
+            except:
+                lists = 0
             for m in mentionlist:
                 mentions.append(m['name'])
             try:
@@ -205,10 +204,9 @@ def preprocess_to_list_Eurovision4(input_json):
             except:
                 ftFration = 0
             try:
-                normalisedfavourites = (favoritecount / followers)
+                normalisedfavourites = (favorites / followers)
             except:
                 normalisedfavourites = 0
-            print('thi si normalised fav', normalisedfavourites)
             try:
                 normalisedmentions = (len(mentions) / followers)
             except:
@@ -222,18 +220,19 @@ def preprocess_to_list_Eurovision4(input_json):
             except:
                 normalisedHashtags = 0
             try:
-                normalisedRetweets = (retweeted / followers)
+                normalisedRetweets = (retweetcount / followers)
             except:
                 normalisedRetweets = 0
+            try:
+                normalisedReplies = (replycount / followers)
+            except:
+                normalisedReplies = 0
             normalisedimages = 0
-            normalisedReplies = 0
             sentiment = 0
             originals = 0
             publicationscore = 0
             userValue = 0
             tweetValue = 0
-            lists = 0
-            statuses = 0
             value = 0
             actualhashtags = 0
 
@@ -242,9 +241,8 @@ def preprocess_to_list_Eurovision4(input_json):
                                 normalisedHashtags, normalisedRetweets, normalisedReplies, sentiment, originals,
                                 publicationscore,
                                 userValue, tweetValue, lists, statuses, value, hashtaglist, createdAt]
-            print(constructed_list)
             retdata.append(constructed_list)
-        # print('this is retdata', retdata)
+            #TODO must make the feature lists from all datasets consistent otherwise, this will skew the confusion / AI results.
     return retdata
 
 def preprocess_to_list_nonTweetBinder(input_json):
@@ -254,7 +252,6 @@ def preprocess_to_list_nonTweetBinder(input_json):
     for i in input_json:
         exculsion = len(i)
         if exculsion > 1:
-            print(i)
             eventcounter = eventcounter + 1
             mentions = []
             hashtaglist = []
@@ -461,7 +458,7 @@ def calc_linear_regression_and_importance_coefficient(network_identifier, in_lis
         #print('Feature: %0d, Score: %.5f' % (i, v))
         networkattributes['Feature: %0d' % (i)] = v
 
-    # plot feature importance
+    #plot feature importance
     #plt.pyplot.bar([x for x in range(len(importance))], importance)
     # Set number of ticks for x-axis
     #plt.pyplot.xticks(range(len(importance)), feature_cols, rotation='vertical')
@@ -692,11 +689,12 @@ def scatter_in_2D(data_in1, data_in2, data_in3):
     pyplot.show()
 
 def AIclassification(data_in1):
+    print(data_in1)
     df = pd.read_csv(data_in1).dropna()
     print(df['Campaign Type'].value_counts())
     x = df.drop('Campaign Type', axis=1)
     y = df['Campaign Type']
-    trainX, testX, trainY, testY = train_test_split(x, y, test_size=0.2, random_state=1)
+    trainX, testX, trainY, testY = train_test_split(x, y, test_size=0.3, random_state=1)
     sc = StandardScaler()
     scaler = sc.fit(trainX)
     trainX_scaled = scaler.transform(trainX)
@@ -731,8 +729,8 @@ def AIclassification(data_in1):
     print(best)
 
     param_grid = {
-        'hidden_layer_sizes': [(300, 200, 100), (150, 100, 50), (120, 80, 40), (100, 50, 30)],
-        'max_iter': [250, 500, 1000],
+        'hidden_layer_sizes': [(150, 100, 50), (120, 80, 40), (100, 50, 30)],
+        'max_iter': [50, 100, 150],
         'activation': ['tanh', 'relu'],
         'solver': ['sgd', 'adam'],
         'alpha': [0.0001, 0.05],
@@ -835,9 +833,9 @@ def separate_by_hashtags(list_in):
 
 if __name__ == '__main__':
     #determining the input files and output files for the various types of routines that can be called
-    infile1 = "C:/users/zephy/documents/botdetect/Nintendo_Tweets_Combined.json"
+    infile1 = "C:/users/zephy/documents/botdetect/pakistanelections2018.json"
     if use_2_datasets:
-        infile2 = "C:/users/zephy/documents/botdetect/TweetsChampions.json"
+        infile2 = "D:/Datasets/TweetBinder and Other datasets/Twitter Euromaidan datasets/72cee1d1-8450-4e16-9133-e571d1e578a2.json"
     if use_3_datasets:
         infile3 = "D:/Datasets/TweetBinder and Other datasets/Twitter Balakot datasets/7e3c13ed-3333-4d5b-ab70-ebdb583f466d.json"
     outputclusterfile1 = "D:/Datasets/TweetBinder and Other datasets/Twitter Balakot datasets/clusterfile1.csv"
@@ -859,36 +857,45 @@ if __name__ == '__main__':
 
     with open(infile1, encoding='utf-8') as JSONfile:
         input_json = json.load(JSONfile)
+    print('---preprocessing dataset 1--- dataset type', dataset1type)
     if dataset1type == 'TweetBinder':
         preprocessed_list1 = preprocess_to_list_tweetbinderonly(input_json)
     elif dataset1type == 'Nintendo':
-        preprocessed_list1 = preprocess_to_list_Nintendo(input_json)
-    elif dataset1type == 'Eurovision4'
-        preprocessed_list1 = preprocess_to_list_Eurovision4(input_json)
+        preprocessed_list1 = preprocess_to_list_Nintendo_and_Eurovision(input_json)
+    elif dataset1type == 'Eurovision4':
+        preprocessed_list1 = preprocess_to_list_Nintendo_and_Eurovision(input_json)
+    elif dataset1type == 'Pakelection':
+        preprocessed_list1 = preprocess_to_list_Pakelect(input_json)
     else:
-        preprocessed_list1 = preprocess_to_list_nonTweetBinder()
+        preprocessed_list1 = preprocess_to_list_nonTweetBinder(input_json)
 
     if use_2_datasets:
         with open(infile2, encoding='utf-8') as JSONfile:
             input_json = json.load(JSONfile)
+        print('---preprocessing dataset 2--- dataset type', dataset2type)
         if dataset2type == 'TweetBinder':
             preprocessed_list2 = preprocess_to_list_tweetbinderonly(input_json)
         elif dataset2type == 'Nintendo':
-            preprocessed_list2 = preprocess_to_list_Nintendo(input_json)
-        elif dataset2type == 'Eurovision4'
-            preprocessed_list1 = preprocess_to_list_Eurovision4(input_json)
+            preprocessed_list2 = preprocess_to_list_Nintendo_and_Eurovision(input_json)
+        elif dataset2type == 'Eurovision4':
+            preprocessed_list2 = preprocess_to_list_Nintendo_and_Eurovision(input_json)
+        elif dataset1type == 'pakelection':
+            preprocessed_list2 = preprocess_to_list_Pakelect(input_json)
         else:
             preprocessed_list2 = preprocess_to_list_nonTweetBinder(input_json)
 
     if use_3_datasets:
         with open(infile3, encoding='utf-8') as JSONfile:
             input_json = json.load(JSONfile)
+        print('---preprocessing dataset 3--- dataset type', dataset3type)
         if dataset3type == 'TweetBinder':
             preprocessed_list3 = preprocess_to_list_tweetbinderonly(input_json)
         elif dataset3type == 'Nintendo':
-            preprocessed_list3 = preprocess_to_list_Nintendo(input_json)
-        elif dataset3type == 'Eurovision4'
-            preprocessed_list1 = preprocess_to_list_Eurovision4(input_json)
+            preprocessed_list3 = preprocess_to_list_Nintendo_and_Eurovision(input_json)
+        elif dataset3type == 'Eurovision4':
+            preprocessed_list3 = preprocess_to_list_Nintendo_and_Eurovision(input_json)
+        elif dataset1type == 'pakelection':
+            preprocessed_list3 = preprocess_to_list_Pakelect(input_json)
         else:
             preprocessed_list3 = preprocess_to_list_nonTweetBinder(input_json)
 
