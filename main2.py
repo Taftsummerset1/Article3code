@@ -57,21 +57,21 @@ dataset2type = 'TweetBinder' #this determines what reader preprocesses the data.
 dataset3type = 'TweetBinder' #this determines what reader preprocesses the data. Options are 'Tweetbinder', 'Eurovision4', 'Pakelect'
 use_entirecampaign = False #if True, all other switches must be false, runs entire dataset and outputs 1 CNA
 use_time = False # Only if above is False, if True, can either time divide or runs dataset via time block - Must change time delta as well.
-use_rows = False # if true, runs dataset in smaller blocks sequentially and provide a CNA for each block, must change no_of_rows_per_run accordinly.
-use_hashtags = True #if true, will pull out each hashtag and generate a CNA for each hashtag within dataset
+use_rows = True # if true, runs dataset in smaller blocks sequentially and provide a CNA for each block, must change no_of_rows_per_run accordinly.
+use_hashtags = False #if true, will pull out each hashtag and generate a CNA for each hashtag within dataset
 use_2_datasets = True #if true, will run two datasets either via row, hashtag or time, and plot the CNAs on scatter plot with clustering
 use_3_datasets = False #if true, will run three datasets - IMPORTANT - use_2_datasets must also be true. Only working for hashtag and Rows
 scatter2D = False # if true, will plot the two CNAs against whatever subspace has been identified.
 plot3d = False # if true, will plot in 3d after linear regression
 classify = True #use the NN classifier to determine the types of campaigns
-no_of_rows_per_run = 10 #used to divide the main campaign
-no_of_tweets_per_hashtag = 50 #defines the minimum number of tweets that can generate a hashtag - data division becomes important for model training in LR / IC function
+no_of_rows_per_run = 500 #used to divide the main campaign
+no_of_tweets_per_hashtag = 200 #defines the minimum number of tweets that can generate a hashtag - data division becomes important for model training in LR / IC function
 time_delta = 3600 #in seconds (unix , 3600 = 1 hour, 86400 = day)
 K = 2 # number of campaigns being clustered
 """ These parameters do not effect processing """
 campaigntype1 = 'Sporting' #first dataset name / type of campaign (political, entertainment, culture, etc)
 campaigntype2 = 'Political' #Second dataset type of campaign (political, entertainment, culture, etc)
-campaigntype3 = 'Conflict2' #Third dataset type of campaign (political, entertainment, culture, etc)
+campaigntype3 = 'Conflict' #Third dataset type of campaign (political, entertainment, culture, etc)
 
 """ These preset values will impact preprocessing only """
 cumulativeevent = 0
@@ -488,7 +488,7 @@ def calc_decisiontreeregression_and_importance_coefficient(network_identifier, i
     col_names = ['textlength', 'normalisedfavourites', 'normailisedimages', 'normalisedmentions', 'normalisedlinks',
                  'normalisedHashtags', 'normalisedRetweets', 'normalisedReplies', 'sentiment', 'originals',
                  'publicationscore',
-                 'userValue', 'tweetValue', 'lists', 'statuses', 'value', 'actualhashtags', 'createdAt']
+                 'userValue', 'tweetValue', 'lists', 'value', 'actualhashtags', 'createdAt']
     # load dataset
 #    pima = pd.read_csv("C:/Users/Work/Documents/PhD/Part 3/dump4.csv", header=None, names=col_names)
     pima = pd.DataFrame(in_list, columns=col_names)
@@ -499,7 +499,7 @@ def calc_decisiontreeregression_and_importance_coefficient(network_identifier, i
 
     feature_cols = ['textlength', 'normailisedimages', 'normalisedmentions', 'normalisedlinks', 'normalisedHashtags',
                     'normalisedRetweets', 'normalisedReplies', 'sentiment', 'originals', 'publicationscore',
-                    'userValue', 'tweetValue', 'lists', 'statuses', 'value']
+                    'userValue', 'tweetValue', 'lists', 'value']
     # define the features from the columns or independent variables
     X = pima[feature_cols]
     # define the taget variable
@@ -524,10 +524,10 @@ def calc_decisiontreeregression_and_importance_coefficient(network_identifier, i
         networkattributes['Feature: %0d' % (i)] = v
 
     # plot feature importance
-    plt.pyplot.bar([x for x in range(len(importance))], importance)
+    #plt.pyplot.bar([x for x in range(len(importance))], importance)
     # Set number of ticks for x-axis
-    plt.pyplot.xticks(range(len(importance)), feature_cols, rotation='vertical')
-    plt.pyplot.show()
+    #plt.pyplot.xticks(range(len(importance)), feature_cols, rotation='vertical')
+    #plt.pyplot.show()
     #pyplot.savefig(f'lr_{network_identifier}.png')
 
     return networkattributes
@@ -549,7 +549,7 @@ def calc_linearRidge_and_importance_coefficient(network_identifier, in_list):
     col_names = ['textlength', 'normalisedfavourites', 'normailisedimages', 'normalisedmentions', 'normalisedlinks',
                  'normalisedHashtags', 'normalisedRetweets', 'normalisedReplies', 'sentiment', 'originals',
                  'publicationscore',
-                 'userValue', 'tweetValue', 'lists', 'statuses', 'value', 'actualhashtags', 'createdAt']
+                 'userValue', 'tweetValue', 'lists', 'value', 'actualhashtags', 'createdAt']
     # load dataset
 #    pima = pd.read_csv("C:/Users/Work/Documents/PhD/Part 3/dump4.csv", header=None, names=col_names)
     pima = pd.DataFrame(in_list, columns=col_names)
@@ -560,7 +560,7 @@ def calc_linearRidge_and_importance_coefficient(network_identifier, in_list):
 
     feature_cols = ['textlength', 'normailisedimages', 'normalisedmentions', 'normalisedlinks', 'normalisedHashtags',
                     'normalisedRetweets', 'normalisedReplies', 'sentiment', 'originals', 'publicationscore',
-                    'userValue', 'tweetValue', 'lists', 'statuses', 'value']
+                    'userValue', 'tweetValue', 'lists', 'value']
     # define the features from the columns or independent variables
     X = pima[feature_cols]
     # define the taget variable
@@ -585,10 +585,10 @@ def calc_linearRidge_and_importance_coefficient(network_identifier, in_list):
         networkattributes['Feature: %0d' % (i)] = v
 
     # plot feature importance
-    plt.pyplot.bar([x for x in range(len(importance))], importance)
+    #plt.pyplot.bar([x for x in range(len(importance))], importance)
     # Set number of ticks for x-axis
-    plt.pyplot.xticks(range(len(importance)), feature_cols, rotation='vertical')
-    plt.pyplot.show()
+    #plt.pyplot.xticks(range(len(importance)), feature_cols, rotation='vertical')
+    #plt.pyplot.show()
     #pyplot.savefig(f'lr_{network_identifier}.png')
 
     return networkattributes
@@ -841,7 +841,7 @@ if __name__ == '__main__':
     if use_2_datasets:
         infile2 = "D:/Datasets/TweetBinder and Other datasets/#electionDay.json"
     if use_3_datasets:
-        infile3 = "D:/Datasets/TweetBinder and Other datasets/Twitter Balakot datasets/7e3c13ed-3333-4d5b-ab70-ebdb583f466d.json"
+        infile3 = "D:/Datasets/TweetBinder and Other datasets/Twitter Balakot datasets/41eb23f5-6e0e-4664-8a76-d7aafeadea4b.json"
     outputclusterfile1 = "D:/Datasets/TweetBinder and Other datasets/Twitter Balakot datasets/clusterfile1.csv"
     outputclusterfile2 = "D:/Datasets/TweetBinder and Other datasets/Twitter Balakot datasets/clusterfile2.csv"
     outputclusterfile3 = "D:/Datasets/TweetBinder and Other datasets/Twitter Balakot datasets/clusterfile3.csv"
@@ -1059,18 +1059,16 @@ if __name__ == '__main__':
                 print('running hashtag', run_in1)
                 print(len(run_in2))
                 cluster_list1 = []
-                net_attributes = calc_linear_regression_and_importance_coefficient(f'{run_in2}_{run_no}', run_in2)
-                # unhash this line for DecisionTree Regression
+                net_attributes1 = calc_linear_regression_and_importance_coefficient(f'{run_in2}_{run_no}', run_in2)
                 #net_attributes1 = calc_decisiontreeregression_and_importance_coefficient(f'{run_in2}_{run_no}', run_in2)
-                # unhash this line for Linear Ridge regression
-                #net_attributes2 = calc_linearRidge_and_importance_coefficient(f'{run_in2}_{run_no}', run_in2)
-                cluster_list1.append(net_attributes['Feature: 1'])  # these features create the subspace
-                cluster_list1.append(net_attributes['Feature: 6'])
-                cluster_list1.append(net_attributes['Feature: 0'])
+                #net_attributes1 = calc_linearRidge_and_importance_coefficient(f'{run_in2}_{run_no}', run_in2)
+                cluster_list1.append(net_attributes1['Feature: 1'])  # these features create the subspace
+                cluster_list1.append(net_attributes1['Feature: 6'])
+                cluster_list1.append(net_attributes1['Feature: 0'])
                 cluster_dict1[run_in1] = cluster_list1
                 with open(outputclusterfile1, "w", newline='', encoding='utf-8') as dump:
                     writer = csv.writer(dump)
-                    writer.writerow(net_attributes.values())
+                    writer.writerow(net_attributes1.values())
                 with open(outputclusterfile1, "r", newline='', encoding='utf-8') as dump, \
                         open(outputclusterfile4, 'a', newline='') as updateddump:
                     reader = csv.reader(dump)
@@ -1094,10 +1092,8 @@ if __name__ == '__main__':
                     print(len(run_in2))
                     cluster_list2 = []
                     net_attributes2 = calc_linear_regression_and_importance_coefficient(f'{run_in2}_{run_no}', run_in2)
-                #    unhash this line for DecisionTree Regression
-                # net_attributes = calc_decisiontreeregression_and_importance_coefficient(f'{run_in2}_{run_no}', run_in2)
-                # unhash this line for Linear Ridge regression
-                # net_attributes2 = calc_linearRidge_and_importance_coefficient(f'{run_in2}_{run_no}', run_in2)
+                    #net_attributes2 = calc_decisiontreeregression_and_importance_coefficient(f'{run_in2}_{run_no}', run_in2)
+                    #net_attributes2 = calc_linearRidge_and_importance_coefficient(f'{run_in2}_{run_no}', run_in2)
                     cluster_list2.append(net_attributes2['Feature: 1'])  # these features create the subspace
                     cluster_list2.append(net_attributes2['Feature: 6'])
                     cluster_list2.append(net_attributes2['Feature: 0'])
@@ -1128,10 +1124,8 @@ if __name__ == '__main__':
                     print(len(run_in2))
                     cluster_list3 = []
                     net_attributes3 = calc_linear_regression_and_importance_coefficient(f'{run_in2}_{run_no}', run_in2)
-                #    unhash this line for DecisionTree Regression
-                # net_attributes = calc_decisiontreeregression_and_importance_coefficient(f'{run_in2}_{run_no}', run_in2)
-                # unhash this line for Linear Ridge regression
-                # net_attributes2 = calc_linearRidge_and_importance_coefficient(f'{run_in2}_{run_no}', run_in2)
+                    #net_attributes3 = calc_decisiontreeregression_and_importance_coefficient(f'{run_in2}_{run_no}', run_in2)
+                    #net_attributes3 = calc_linearRidge_and_importance_coefficient(f'{run_in2}_{run_no}', run_in2)
                     cluster_list3.append(net_attributes3['Feature: 1'])  # these features create the subspace
                     cluster_list3.append(net_attributes3['Feature: 6'])
                     cluster_list3.append(net_attributes3['Feature: 0'])
