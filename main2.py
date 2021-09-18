@@ -57,20 +57,24 @@ dataset2type = 'TweetBinder' #this determines what reader preprocesses the data.
 dataset3type = 'TweetBinder' #this determines what reader preprocesses the data. Options are 'Tweetbinder', 'Eurovision4', 'Pakelect'
 use_entirecampaign = False #if True, all other switches must be false, runs entire dataset and outputs 1 CNA
 use_time = False # Only if above is False, if True, can either time divide or runs dataset via time block - Must change time delta as well.
-use_rows = True # if true, runs dataset in smaller blocks sequentially and provide a CNA for each block, must change no_of_rows_per_run accordinly.
+use_rows = False # if true, runs dataset in smaller blocks sequentially and provide a CNA for each block, must change no_of_rows_per_run accordinly.
 use_hashtags = False #if true, will pull out each hashtag and generate a CNA for each hashtag within dataset
 use_2_datasets = True #if true, will run two datasets either via row, hashtag or time, and plot the CNAs on scatter plot with clustering
 use_3_datasets = False #if true, will run three datasets - IMPORTANT - use_2_datasets must also be true. Only working for hashtag and Rows
 scatter2D = False # if true, will plot the two CNAs against whatever subspace has been identified.
 plot3d = False # if true, will plot in 3d after linear regression
-classify = True #use the NN classifier to determine the types of campaigns
+classify = False #use the NN classifier to determine the types of campaigns
+optimise = True #iterate over a hashtag or row range to find optimal network size for classification
+minimum_network_size = 50
+maximum_network_size = 2000
+step_size = 50 # for optimisation of classification
 no_of_rows_per_run = 500 #used to divide the main campaign
-no_of_tweets_per_hashtag = 200 #defines the minimum number of tweets that can generate a hashtag - data division becomes important for model training in LR / IC function
+no_of_tweets_per_hashtag = 100 #minimum number of tweets that can generate a hashtag - data division becomes important for model training in LR / IC function
 time_delta = 3600 #in seconds (unix , 3600 = 1 hour, 86400 = day)
 K = 2 # number of campaigns being clustered
 """ These parameters do not effect processing """
-campaigntype1 = 'Sporting' #first dataset name / type of campaign (political, entertainment, culture, etc)
-campaigntype2 = 'Political' #Second dataset type of campaign (political, entertainment, culture, etc)
+campaigntype1 = 'Balakot' #first dataset name / type of campaign (political, entertainment, culture, etc)
+campaigntype2 = 'Euromaidan' #Second dataset type of campaign (political, entertainment, culture, etc)
 campaigntype3 = 'Conflict' #Third dataset type of campaign (political, entertainment, culture, etc)
 
 """ These preset values will impact preprocessing only """
@@ -157,7 +161,7 @@ def preprocess_to_list_Nintendo_and_Eurovision(input_json):
                 normalisedimages = 0
             constructed_list = [textlength, normalisedfavourites, normalisedimages, normalisedmentions,
                                 normalisedlinks,
-                                normalisedHashtags, normalisedRetweets, normalisedReplies,  retweetcount,favoritecount, hashtaglist, createdAt]
+                                normalisedHashtags, normalisedRetweets, normalisedReplies,  retweetcount,favoritecount, hashtaglist]
             retdata.append(constructed_list)
             print(constructed_list)
         if retweetcount != 0:
@@ -407,7 +411,7 @@ def preprocess_to_list_tweetbinderonly(input_json):
             constructed_list = [textlength, normalisedfavourites, normalisedimages, normalisedmentions, normalisedlinks,
                                 normalisedHashtags, normalisedRetweets, normalisedReplies, sentiment, originals,
                                 publicationscore,
-                                userValue, tweetValue, lists, value, actualhashtags, createdAt]
+                                userValue, tweetValue, lists, value, actualhashtags]
             retdata.append(constructed_list)
     return retdata
 
@@ -427,7 +431,7 @@ def calc_linear_regression_and_importance_coefficient(network_identifier, in_lis
 #    NAfile = "C:/Users/Work/Documents/PhD/Part 3/networkattributes.csv"
     col_names = ['textlength', 'normalisedfavourites', 'normailisedimages', 'normalisedmentions', 'normalisedlinks',
                  'normalisedHashtags', 'normalisedRetweets', 'normalisedReplies', 'sentiment', 'originals',
-                 'publicationscore', 'userValue', 'tweetValue', 'lists', 'value', 'actualhashtags', 'createdAt']
+                 'publicationscore', 'userValue', 'tweetValue', 'lists', 'value', 'actualhashtags']
     # load dataset
 #    pima = pd.read_csv("C:/Users/Work/Documents/PhD/Part 3/dump4.csv", header=None, names=col_names)
     pima = pd.DataFrame(in_list, columns=col_names)
@@ -692,6 +696,46 @@ def scatter_in_2D(data_in1, data_in2, data_in3):
     pyplot.ylabel('Twitter generated User Value')
     pyplot.show()
 
+def simpleAIclassification(data_in1):
+    print(data_in1)
+    df = pd.read_csv(data_in1).dropna()
+    print(df['Campaign Type'].value_counts())
+    x = df.drop('Campaign Type', axis=1)
+    y = df['Campaign Type']
+    trainX, testX, trainY, testY = train_test_split(x, y, test_size=0.3, random_state=1)
+    sc = StandardScaler()
+    scaler = sc.fit(trainX)
+    trainX_scaled = scaler.transform(trainX)
+    testX_scaled = scaler.transform(testX)
+    mlp_clf = MLPClassifier(hidden_layer_sizes=(150, 100, 50),
+                            max_iter=300, activation='relu',
+                            solver='adam')
+
+    mlp_clf.fit(trainX_scaled, trainY)
+    y_pred = mlp_clf.predict(testX_scaled)
+
+    print('Accuracy: {:.2f}'.format(accuracy_score(testY, y_pred)))
+    result = accuracy_score(testY, y_pred)
+    return result
+    #param_grid = {
+   #     'hidden_layer_sizes': [(150, 100, 50), (120, 80, 40), (100, 50, 30)],
+    #    'max_iter': [50, 100, 150],
+      #  'activation': ['tanh', 'relu'],
+     #   'solver': ['sgd', 'adam'],
+     #   'alpha': [0.0001, 0.05],
+      #  'learning_rate': ['constant', 'adaptive'],
+    #}
+
+    #grid = GridSearchCV(mlp_clf, param_grid, n_jobs=-1, cv=5)
+    #grid.fit(trainX_scaled, trainY)
+
+    #print(grid.best_params_)
+
+    #grid_predictions = grid.predict(testX_scaled)
+
+    #print('Accuracy: {:.2f}'.format(accuracy_score(testY, grid_predictions)))
+
+
 def AIclassification(data_in1):
     print(data_in1)
     df = pd.read_csv(data_in1).dropna()
@@ -731,7 +775,8 @@ def AIclassification(data_in1):
                 space=hp.normal('x', 4.9, 0.5), algo=tpe.suggest,
                 max_evals=2000)
     print(best)
-
+    result = accuracy_score(testY, y_pred)
+    return result
     #param_grid = {
    #     'hidden_layer_sizes': [(150, 100, 50), (120, 80, 40), (100, 50, 30)],
     #    'max_iter': [50, 100, 150],
@@ -835,11 +880,103 @@ def separate_by_hashtags(list_in):
         mainsethashtag[key] = hashtagnetwork["%s" % key]
     return mainsethashtag
 
+def run_hashtag_1(hashtagtracker, ):
+    run_no = 0
+    cluster_dict1 = {}
+    for run_in1 in hashtagtracker:
+        run_in2 = hashtagtracker[run_in1]
+        if 10 <= len(run_in2) <= (
+                step_size + minimum_network_size):  # this number can be fine turned to determine the hashtag network size analysed.
+            run_no = run_no + 1
+            print('running hashtag', run_in1)
+            print(len(run_in2))
+            cluster_list1 = []
+            net_attributes1 = calc_linear_regression_and_importance_coefficient(f'{run_in2}_{run_no}', run_in2)
+            # net_attributes1 = calc_decisiontreeregression_and_importance_coefficient(f'{run_in2}_{run_no}', run_in2)
+            # net_attributes1 = calc_linearRidge_and_importance_coefficient(f'{run_in2}_{run_no}', run_in2)
+            cluster_list1.append(net_attributes1['Feature: 1'])  # these features create the subspace
+            cluster_list1.append(net_attributes1['Feature: 6'])
+            cluster_list1.append(net_attributes1['Feature: 0'])
+            cluster_dict1[run_in1] = cluster_list1
+            with open(outputclusterfile1, "w", newline='', encoding='utf-8') as dump:
+                writer = csv.writer(dump)
+                writer.writerow(net_attributes1.values())
+            with open(outputclusterfile1, "r", newline='', encoding='utf-8') as dump, \
+                    open(outputclusterfile4, 'a', newline='') as updateddump:
+                reader = csv.reader(dump)
+                writer = csv.writer(updateddump)
+                for row in reader:
+                    row.append(campaigntype1)
+                    writer.writerow(row)
+            dump.close()
+            updateddump.close()
+
+def run_hashtag_2(hashtagtracker2):
+    run_no = 0
+    cluster_dict2 = {}
+    for run_in1 in hashtagtracker2:
+        run_in2 = hashtagtracker2[run_in1]
+        if 10 <= len(run_in2) <= (
+                step_size + minimum_network_size):  # this number can be fine turned to determine the hashtag network size analysed.
+            run_no = run_no + 1
+            print('running hashtag', run_in1)
+            print(len(run_in2))
+            cluster_list2 = []
+            net_attributes2 = calc_linear_regression_and_importance_coefficient(f'{run_in2}_{run_no}', run_in2)
+            # net_attributes2 = calc_decisiontreeregression_and_importance_coefficient(f'{run_in2}_{run_no}', run_in2)
+            # net_attributes2 = calc_linearRidge_and_importance_coefficient(f'{run_in2}_{run_no}', run_in2)
+            cluster_list2.append(net_attributes2['Feature: 1'])  # these features create the subspace
+            cluster_list2.append(net_attributes2['Feature: 6'])
+            cluster_list2.append(net_attributes2['Feature: 0'])
+            cluster_dict2[run_in1] = cluster_list2
+            with open(outputclusterfile2, "w", newline='', encoding='utf-8') as dump:
+                writer = csv.writer(dump)
+                writer.writerow(net_attributes2.values())
+            with open(outputclusterfile2, "r", newline='', encoding='utf-8') as dump, \
+                    open(outputclusterfile4, 'a', newline='') as updateddump:
+                reader = csv.reader(dump)
+                writer = csv.writer(updateddump)
+                for row in reader:
+                    row.append(campaigntype2)
+                    writer.writerow(row)
+            dump.close()
+            updateddump.close()
+
+def run_hashtag_3(hashtagtracker3):
+    run_no = 0
+    cluster_dict3 = {}
+    for run_in1 in hashtagtracker3:
+        run_in2 = hashtagtracker3[run_in1]
+        if len(run_in2) >= no_of_tweets_per_hashtag:  # this number can be fine turned to determine the hashtag network size analysed.
+            run_no = run_no + 1
+            print('running hashtag', run_in1)
+            print(len(run_in2))
+            cluster_list3 = []
+            net_attributes3 = calc_linear_regression_and_importance_coefficient(f'{run_in2}_{run_no}', run_in2)
+            # net_attributes3 = calc_decisiontreeregression_and_importance_coefficient(f'{run_in2}_{run_no}', run_in2)
+            # net_attributes3 = calc_linearRidge_and_importance_coefficient(f'{run_in2}_{run_no}', run_in2)
+            cluster_list3.append(net_attributes3['Feature: 1'])  # these features create the subspace
+            cluster_list3.append(net_attributes3['Feature: 6'])
+            cluster_list3.append(net_attributes3['Feature: 0'])
+            cluster_dict3[run_in1] = cluster_list3
+            with open(outputclusterfile3, "w", newline='', encoding='utf-8') as dump:
+                writer = csv.writer(dump)
+                writer.writerow(net_attributes3.values())
+            with open(outputclusterfile3, "r", newline='', encoding='utf-8') as dump, \
+                    open(outputclusterfile4, 'a', newline='') as updateddump:
+                reader = csv.reader(dump)
+                writer = csv.writer(updateddump)
+                for row in reader:
+                    row.append(campaigntype3)
+                    writer.writerow(row)
+        dump.close()
+        updateddump.close()
+
 if __name__ == '__main__':
     #determining the input files and output files for the various types of routines that can be called
-    infile1 = "D:/Datasets/TweetBinder and Other datasets/FIFAWWC.json"
+    infile1 = "D:/Datasets/TweetBinder and Other datasets/Twitter Balakot datasets/7e3c13ed-3333-4d5b-ab70-ebdb583f466d.json"
     if use_2_datasets:
-        infile2 = "D:/Datasets/TweetBinder and Other datasets/#electionDay.json"
+        infile2 = "D:/Datasets/TweetBinder and Other datasets/Twitter Euromaidan datasets/72cee1d1-8450-4e16-9133-e571d1e578a2.json"
     if use_3_datasets:
         infile3 = "D:/Datasets/TweetBinder and Other datasets/Twitter Balakot datasets/41eb23f5-6e0e-4664-8a76-d7aafeadea4b.json"
     outputclusterfile1 = "D:/Datasets/TweetBinder and Other datasets/Twitter Balakot datasets/clusterfile1.csv"
@@ -907,6 +1044,7 @@ if __name__ == '__main__':
                     'normalisedHashtags',
                     'normalisedRetweets', 'normalisedReplies', 'sentiment', 'originals', 'publicationscore',
                     'userValue', 'tweetValue', 'lists', 'statuses', 'value', 'Campaign Type']
+
     if use_rows:
         print('Data is divided by', no_of_rows_per_run, 'rows')
         if use_2_datasets:
@@ -951,6 +1089,7 @@ if __name__ == '__main__':
 
         if use_2_datasets:
             print('_-_-_-_-Processing 2nd Dataset _-_-_-_-')
+            datasetnumber = 2
             cluster_dict2 = {}
             separated_preprocessed_list2 = separate_list_by_rows(preprocessed_list2, no_of_rows_per_run)
             run_no = 0
@@ -1054,14 +1193,14 @@ if __name__ == '__main__':
             writer.writerow(feature_cols)
         for run_in1 in hashtagtracker:
             run_in2 = hashtagtracker[run_in1]
-            if len(run_in2) >= no_of_tweets_per_hashtag:  # this number can be fine turned to determine the hashtag network size analysed.
+            if len(run_in2) <= no_of_tweets_per_hashtag:  # this number can be fine turned to determine the hashtag network size analysed.
                 run_no = run_no + 1
                 print('running hashtag', run_in1)
                 print(len(run_in2))
                 cluster_list1 = []
                 net_attributes1 = calc_linear_regression_and_importance_coefficient(f'{run_in2}_{run_no}', run_in2)
-                #net_attributes1 = calc_decisiontreeregression_and_importance_coefficient(f'{run_in2}_{run_no}', run_in2)
-                #net_attributes1 = calc_linearRidge_and_importance_coefficient(f'{run_in2}_{run_no}', run_in2)
+                # net_attributes1 = calc_decisiontreeregression_and_importance_coefficient(f'{run_in2}_{run_no}', run_in2)
+                # net_attributes1 = calc_linearRidge_and_importance_coefficient(f'{run_in2}_{run_no}', run_in2)
                 cluster_list1.append(net_attributes1['Feature: 1'])  # these features create the subspace
                 cluster_list1.append(net_attributes1['Feature: 6'])
                 cluster_list1.append(net_attributes1['Feature: 0'])
@@ -1074,11 +1213,10 @@ if __name__ == '__main__':
                     reader = csv.reader(dump)
                     writer = csv.writer(updateddump)
                     for row in reader:
-                            row.append(campaigntype1)
-                            writer.writerow(row)
+                        row.append(campaigntype1)
+                        writer.writerow(row)
                 dump.close()
                 updateddump.close()
-
         if use_2_datasets:
             print('_-_-_-_-Processing 2nd Dataset _-_-_-_-')
             hashtagtracker2 = separate_by_hashtags(preprocessed_list2)
@@ -1086,7 +1224,7 @@ if __name__ == '__main__':
             cluster_dict2 = {}
             for run_in1 in hashtagtracker2:
                 run_in2 = hashtagtracker2[run_in1]
-                if len(run_in2) >= no_of_tweets_per_hashtag:  # this number can be fine turned to determine the hashtag network size analysed.
+                if len(run_in2) <= no_of_tweets_per_hashtag:  # this number can be fine turned to determine the hashtag network size analysed.
                     run_no = run_no + 1
                     print('running hashtag', run_in1)
                     print(len(run_in2))
@@ -1161,6 +1299,31 @@ if __name__ == '__main__':
                 plotting3d(cluster_dict1, null, null)
         if classify:
             AIclassification(outputclusterfile4)
+    if optimise:
+        network_size = []
+        accuracy_result = []
+        while minimum_network_size < maximum_network_size:
+            print('this is min', 10, 'this is max', (minimum_network_size + step_size))
+            hashtagtracker1 = separate_by_hashtags(preprocessed_list1)
+            if use_2_datasets:
+                hashtagtracker2 = separate_by_hashtags(preprocessed_list2)
+            if use_3_datasets:
+                hashtagtracker3 = separate_by_hashtags(preprocessed_list3)
+            run_hashtag_1(hashtagtracker1)
+            if use_2_datasets:
+                run_hashtag_2(hashtagtracker2)
+            if use_3_datasets:
+                run_hashtag_3(hashtagtracker3)
+            result = simpleAIclassification(outputclusterfile4)
+            accuracy_result.append(result)
+            network_size.append(minimum_network_size + step_size)
+            minimum_network_size = minimum_network_size + step_size
+            print(network_size, accuracy_result)
+        pyplot.scatter(accuracy_result, network_size, marker="s", s=80, cmap="black")
+        pyplot.show()
+
+
+
 
     elif use_entirecampaign:
         print('dataset undivided')
