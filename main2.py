@@ -65,9 +65,9 @@ scatter2D = False # if true, will plot the two CNAs against whatever subspace ha
 plot3d = False # if true, will plot in 3d after linear regression
 classify = False #use the NN classifier to determine the types of campaigns
 optimise = True #iterate over a hashtag or row range to find optimal network size for classification
-minimum_network_size = 50
+minimum_network_size = 100
 maximum_network_size = 2000
-step_size = 50 # for optimisation of classification
+step_size = 100 # for optimisation of classification
 no_of_rows_per_run = 500 #used to divide the main campaign
 no_of_tweets_per_hashtag = 100 #minimum number of tweets that can generate a hashtag - data division becomes important for model training in LR / IC function
 time_delta = 3600 #in seconds (unix , 3600 = 1 hour, 86400 = day)
@@ -880,12 +880,12 @@ def separate_by_hashtags(list_in):
         mainsethashtag[key] = hashtagnetwork["%s" % key]
     return mainsethashtag
 
-def run_hashtag_1(hashtagtracker, ):
+def run_hashtag_1(hashtagtracker):
     run_no = 0
     cluster_dict1 = {}
     for run_in1 in hashtagtracker:
         run_in2 = hashtagtracker[run_in1]
-        if 10 <= len(run_in2) <= (
+        if minimum_network_size <= len(run_in2) <= (
                 step_size + minimum_network_size):  # this number can be fine turned to determine the hashtag network size analysed.
             run_no = run_no + 1
             print('running hashtag', run_in1)
@@ -898,6 +898,10 @@ def run_hashtag_1(hashtagtracker, ):
             cluster_list1.append(net_attributes1['Feature: 6'])
             cluster_list1.append(net_attributes1['Feature: 0'])
             cluster_dict1[run_in1] = cluster_list1
+            feature_cols = ['textlength', 'normailisedimages', 'normalisedmentions', 'normalisedlinks',
+                            'normalisedHashtags',
+                            'normalisedRetweets', 'normalisedReplies', 'sentiment', 'originals', 'publicationscore',
+                            'userValue', 'tweetValue', 'lists', 'value', 'Campaign Type']
             with open(outputclusterfile1, "w", newline='', encoding='utf-8') as dump:
                 writer = csv.writer(dump)
                 writer.writerow(net_attributes1.values())
@@ -916,7 +920,7 @@ def run_hashtag_2(hashtagtracker2):
     cluster_dict2 = {}
     for run_in1 in hashtagtracker2:
         run_in2 = hashtagtracker2[run_in1]
-        if 10 <= len(run_in2) <= (
+        if minimum_network_size <= len(run_in2) <= (
                 step_size + minimum_network_size):  # this number can be fine turned to determine the hashtag network size analysed.
             run_no = run_no + 1
             print('running hashtag', run_in1)
@@ -947,7 +951,8 @@ def run_hashtag_3(hashtagtracker3):
     cluster_dict3 = {}
     for run_in1 in hashtagtracker3:
         run_in2 = hashtagtracker3[run_in1]
-        if len(run_in2) >= no_of_tweets_per_hashtag:  # this number can be fine turned to determine the hashtag network size analysed.
+        if minimum_network_size <= len(run_in2) <= (
+                step_size + minimum_network_size):  # this number can be fine turned to determine the hashtag network size analysed.
             run_no = run_no + 1
             print('running hashtag', run_in1)
             print(len(run_in2))
@@ -974,7 +979,7 @@ def run_hashtag_3(hashtagtracker3):
 
 if __name__ == '__main__':
     #determining the input files and output files for the various types of routines that can be called
-    infile1 = "D:/Datasets/TweetBinder and Other datasets/Twitter Balakot datasets/7e3c13ed-3333-4d5b-ab70-ebdb583f466d.json"
+    infile1 = "D:/Datasets/TweetBinder and Other datasets/Twitter Balakot datasets/5dd75c59-233c-47e7-ad25-e493710778fe.json"
     if use_2_datasets:
         infile2 = "D:/Datasets/TweetBinder and Other datasets/Twitter Euromaidan datasets/72cee1d1-8450-4e16-9133-e571d1e578a2.json"
     if use_3_datasets:
@@ -1303,7 +1308,14 @@ if __name__ == '__main__':
         network_size = []
         accuracy_result = []
         while minimum_network_size < maximum_network_size:
-            print('this is min', 10, 'this is max', (minimum_network_size + step_size))
+            feature_cols = ['textlength', 'normailisedimages', 'normalisedmentions', 'normalisedlinks',
+                            'normalisedHashtags',
+                            'normalisedRetweets', 'normalisedReplies', 'sentiment', 'originals', 'publicationscore',
+                            'userValue', 'tweetValue', 'lists', 'value', 'Campaign Type']
+            with open(outputclusterfile4, "w", newline='') as output:
+                writer = csv.writer(output)
+                writer.writerow(feature_cols)
+            print('this is min', (minimum_network_size), 'this is max', (minimum_network_size + step_size))
             hashtagtracker1 = separate_by_hashtags(preprocessed_list1)
             if use_2_datasets:
                 hashtagtracker2 = separate_by_hashtags(preprocessed_list2)
