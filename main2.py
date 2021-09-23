@@ -2,6 +2,7 @@
 """
 import json
 import csv
+import operator
 from uuid import uuid4
 from datetime import datetime
 import time
@@ -64,10 +65,8 @@ use_3_datasets = False #if true, will run three datasets - IMPORTANT - use_2_dat
 scatter2D = False # if true, will plot the two CNAs against whatever subspace has been identified.
 plot3d = False # if true, will plot in 3d after linear regression
 classify = False #use the NN classifier to determine the types of campaigns
-optimise = True #iterate over a hashtag or row range to find optimal network size for classification
-minimum_network_size = 100
-maximum_network_size = 2000
-step_size = 100 # for optimisation of classification
+optimise_by_no_hashtags = False # finds and plots accuracy of AI using hashtag networks with specific tweets per network
+optimise_by_hashtag_block = True #finds accurcy of AI using blocks of hashtag networks with set sizes
 no_of_rows_per_run = 500 #used to divide the main campaign
 no_of_tweets_per_hashtag = 100 #minimum number of tweets that can generate a hashtag - data division becomes important for model training in LR / IC function
 time_delta = 3600 #in seconds (unix , 3600 = 1 hour, 86400 = day)
@@ -880,11 +879,55 @@ def separate_by_hashtags(list_in):
         mainsethashtag[key] = hashtagnetwork["%s" % key]
     return mainsethashtag
 
+def run_hashtag_1_step_size(hashtagtracker, minimum_block_size, blocksize):
+    no_of_hashtag_networks = 0
+    print('processing', blocksize, 'networks from top', minimum_block_size, 'to', (minimum_block_size + blocksize))
+    hashtagnetworks = {}
+    run_no = 0
+    cluster_list1 = []
+    cluster_dict1 = {}
+    for run_in1 in hashtagtracker:
+        run_in2 = hashtagtracker[run_in1]
+        hashtagnetworks[run_in1] = len(run_in2)
+        sortedhashtagnetworks = sorted(hashtagnetworks.items(), reverse=True, key=lambda item: item[1])
+    print(sortedhashtagnetworks)
+    shortlist = sortedhashtagnetworks[minimum_block_size:(minimum_block_size + blocksize)]
+    print(shortlist)
+    for i in shortlist:
+        h = (i[0])
+        run_in2 = hashtagtracker[h]
+        net_attributes1 = calc_linear_regression_and_importance_coefficient(f'{run_in2}_{run_no}', run_in2)
+        print(h, 'is run in and result', net_attributes1)
+        # net_attributes1 = calc_decisiontreeregression_and_importance_coefficient(f'{run_in2}_{run_no}', run_in2)
+        # net_attributes1 = calc_linearRidge_and_importance_coefficient(f'{run_in2}_{run_no}', run_in2)
+        cluster_list1.append(net_attributes1['Feature: 1'])  # these features create the subspace
+        cluster_list1.append(net_attributes1['Feature: 6'])
+        cluster_list1.append(net_attributes1['Feature: 0'])
+        cluster_dict1[run_in1] = cluster_list1
+        feature_cols = ['textlength', 'normailisedimages', 'normalisedmentions', 'normalisedlinks',
+                        'normalisedHashtags',
+                        'normalisedRetweets', 'normalisedReplies', 'sentiment', 'originals', 'publicationscore',
+                        'userValue', 'tweetValue', 'lists', 'value', 'Campaign Type']
+        with open(outputclusterfile1, "w", newline='', encoding='utf-8') as dump:
+            writer = csv.writer(dump)
+            writer.writerow(net_attributes1.values())
+        with open(outputclusterfile1, "r", newline='', encoding='utf-8') as dump, \
+                open(outputclusterfile4, 'a', newline='') as updateddump:
+            reader = csv.reader(dump)
+            writer = csv.writer(updateddump)
+            for row in reader:
+                row.append(campaigntype1)
+                writer.writerow(row)
+        dump.close()
+        updateddump.close()
+
 def run_hashtag_1(hashtagtracker):
+    hashtagnetworks = {}
     run_no = 0
     cluster_dict1 = {}
     for run_in1 in hashtagtracker:
         run_in2 = hashtagtracker[run_in1]
+        hashtagnetworks[run_in1] = len(run_in2)
         if minimum_network_size <= len(run_in2) <= (
                 step_size + minimum_network_size):  # this number can be fine turned to determine the hashtag network size analysed.
             run_no = run_no + 1
@@ -914,6 +957,47 @@ def run_hashtag_1(hashtagtracker):
                     writer.writerow(row)
             dump.close()
             updateddump.close()
+def run_hashtag_2_step_size(hashtagtracker, minimum_block_size, blocksize):
+    no_of_hashtag_networks = 0
+    print('processing the largest', blocksize, 'hashtag networks')
+    hashtagnetworks = {}
+    run_no = 0
+    cluster_list2 = []
+    cluster_dict2 = {}
+    for run_in1 in hashtagtracker:
+        run_in2 = hashtagtracker[run_in1]
+        hashtagnetworks[run_in1] = len(run_in2)
+        sortedhashtagnetworks = sorted(hashtagnetworks.items(), reverse=True, key=lambda item: item[1])
+    print(sortedhashtagnetworks)
+    shortlist = sortedhashtagnetworks[minimum_block_size:(minimum_block_size + blocksize)]
+    print(shortlist)
+    for i in shortlist:
+        h = (i[0])
+        run_in2 = hashtagtracker[h]
+        net_attributes2 = calc_linear_regression_and_importance_coefficient(f'{run_in2}_{run_no}', run_in2)
+        print(h, 'is run in and result', net_attributes2)
+        # net_attributes1 = calc_decisiontreeregression_and_importance_coefficient(f'{run_in2}_{run_no}', run_in2)
+        # net_attributes1 = calc_linearRidge_and_importance_coefficient(f'{run_in2}_{run_no}', run_in2)
+        cluster_list2.append(net_attributes2['Feature: 1'])  # these features create the subspace
+        cluster_list2.append(net_attributes2['Feature: 6'])
+        cluster_list2.append(net_attributes2['Feature: 0'])
+        cluster_dict2[run_in1] = cluster_list2
+        feature_cols = ['textlength', 'normailisedimages', 'normalisedmentions', 'normalisedlinks',
+                        'normalisedHashtags',
+                        'normalisedRetweets', 'normalisedReplies', 'sentiment', 'originals', 'publicationscore',
+                        'userValue', 'tweetValue', 'lists', 'value', 'Campaign Type']
+        with open(outputclusterfile2, "w", newline='', encoding='utf-8') as dump:
+            writer = csv.writer(dump)
+            writer.writerow(net_attributes2.values())
+        with open(outputclusterfile2, "r", newline='', encoding='utf-8') as dump, \
+                open(outputclusterfile4, 'a', newline='') as updateddump:
+            reader = csv.reader(dump)
+            writer = csv.writer(updateddump)
+            for row in reader:
+                row.append(campaigntype2)
+                writer.writerow(row)
+        dump.close()
+        updateddump.close()
 
 def run_hashtag_2(hashtagtracker2):
     run_no = 0
@@ -945,6 +1029,51 @@ def run_hashtag_2(hashtagtracker2):
                     writer.writerow(row)
             dump.close()
             updateddump.close()
+
+def run_hashtag_3_step_size(hashtagtracker, max_network_size, step_size):
+    no_of_hashtag_networks = 0
+    print('hashtag networks', no_of_hashtag_networks)
+    print('max network size', max_network_size)
+    print('step size', step_size)
+    hashtagnetworks = {}
+    run_no = 0
+    cluster_list3 = []
+    cluster_dict3 = {}
+    for run_in1 in hashtagtracker:
+        run_in2 = hashtagtracker[run_in1]
+        hashtagnetworks[run_in1] = len(run_in2)
+        sortedhashtagnetworks = sorted(hashtagnetworks.items(), reverse=True, key=lambda item: item[1])
+    print(sortedhashtagnetworks)
+    shortlist = sortedhashtagnetworks[no_of_hashtag_networks:(no_of_hashtag_networks + step_size)]
+    print(shortlist)
+    for i in shortlist:
+        print(i)
+        h = (i[0])
+        run_in2 = hashtagtracker[h]
+        net_attributes3 = calc_linear_regression_and_importance_coefficient(f'{run_in2}_{run_no}', run_in2)
+        print(h, 'is run in and result', net_attributes1)
+        # net_attributes1 = calc_decisiontreeregression_and_importance_coefficient(f'{run_in2}_{run_no}', run_in2)
+        # net_attributes1 = calc_linearRidge_and_importance_coefficient(f'{run_in2}_{run_no}', run_in2)
+        cluster_list3.append(net_attributes1['Feature: 1'])  # these features create the subspace
+        cluster_list3.append(net_attributes1['Feature: 6'])
+        cluster_list3.append(net_attributes1['Feature: 0'])
+        cluster_dict3[run_in1] = cluster_list1
+        feature_cols = ['textlength', 'normailisedimages', 'normalisedmentions', 'normalisedlinks',
+                        'normalisedHashtags',
+                        'normalisedRetweets', 'normalisedReplies', 'sentiment', 'originals', 'publicationscore',
+                        'userValue', 'tweetValue', 'lists', 'value', 'Campaign Type']
+        with open(outputclusterfile1, "w", newline='', encoding='utf-8') as dump:
+            writer = csv.writer(dump)
+            writer.writerow(net_attributes3.values())
+        with open(outputclusterfile3, "r", newline='', encoding='utf-8') as dump, \
+                open(outputclusterfile4, 'a', newline='') as updateddump:
+            reader = csv.reader(dump)
+            writer = csv.writer(updateddump)
+            for row in reader:
+                row.append(campaigntype3)
+                writer.writerow(row)
+        dump.close()
+        updateddump.close()
 
 def run_hashtag_3(hashtagtracker3):
     run_no = 0
@@ -979,7 +1108,7 @@ def run_hashtag_3(hashtagtracker3):
 
 if __name__ == '__main__':
     #determining the input files and output files for the various types of routines that can be called
-    infile1 = "D:/Datasets/TweetBinder and Other datasets/Twitter Balakot datasets/5dd75c59-233c-47e7-ad25-e493710778fe.json"
+    infile1 = "D:/Datasets/TweetBinder and Other datasets/FIFAWWC.json"
     if use_2_datasets:
         infile2 = "D:/Datasets/TweetBinder and Other datasets/Twitter Euromaidan datasets/72cee1d1-8450-4e16-9133-e571d1e578a2.json"
     if use_3_datasets:
@@ -1304,9 +1433,28 @@ if __name__ == '__main__':
                 plotting3d(cluster_dict1, null, null)
         if classify:
             AIclassification(outputclusterfile4)
-    if optimise:
+
+    if optimise_by_no_hashtags:
+        minimum_network_size = 50
+        maximum_network_size = 0
+        step_size = 50  # for optimisation of classification
+        list_of_dataset_sizes = []
+        smallest = []
         network_size = []
         accuracy_result = []
+        list_of_dataset_sizes.append(len(preprocessed_list1))
+        print('list 1', list_of_dataset_sizes)
+        if use_2_datasets:
+            list_of_dataset_sizes.append(len(preprocessed_list2))
+            print('list 1 and 2', list_of_dataset_sizes)
+        if use_3_datasets:
+            list_of_dataset_sizes.append(len(preprocessed_list3))
+            print('list 1 and 2 and 3', list_of_dataset_sizes)
+        list_of_dataset_sizes.sort(reverse=True)
+        smallest_dataset = int(list_of_dataset_sizes[0])
+        print('Largest dataset', smallest_dataset)
+        maximum_network_size = (smallest_dataset / 100)
+        print('max network size', maximum_network_size)
         while minimum_network_size < maximum_network_size:
             feature_cols = ['textlength', 'normailisedimages', 'normalisedmentions', 'normalisedlinks',
                             'normalisedHashtags',
@@ -1321,19 +1469,65 @@ if __name__ == '__main__':
                 hashtagtracker2 = separate_by_hashtags(preprocessed_list2)
             if use_3_datasets:
                 hashtagtracker3 = separate_by_hashtags(preprocessed_list3)
-            run_hashtag_1(hashtagtracker1)
+            run_hashtag_1_step_size(hashtagtracker1, minimum_network_size, maximum_network_size)
             if use_2_datasets:
-                run_hashtag_2(hashtagtracker2)
+                run_hashtag_2_step_size(hashtagtracker2, minimum_network_size, max_network_size)
             if use_3_datasets:
-                run_hashtag_3(hashtagtracker3)
+                run_hashtag_3_step_size(hashtagtracker3, maximum_network_size, step_size)
             result = simpleAIclassification(outputclusterfile4)
             accuracy_result.append(result)
             network_size.append(minimum_network_size + step_size)
             minimum_network_size = minimum_network_size + step_size
             print(network_size, accuracy_result)
-        pyplot.scatter(accuracy_result, network_size, marker="s", s=80, cmap="black")
+        pyplot.scatter(network_size, accuracy_result, marker="s", s=80, cmap="black")
         pyplot.show()
 
+    if optimise_by_hashtag_block:
+        minimum_block_size = 0
+        blocksize = 50  # for optimisation of classification
+        list_of_dataset_sizes = []
+        smallest = []
+        blocktrack = []
+        accuracy_result = []
+        list_of_dataset_sizes.append(len(preprocessed_list1))
+        print('list 1', list_of_dataset_sizes)
+        if use_2_datasets:
+            list_of_dataset_sizes.append(len(preprocessed_list2))
+            print('list 1 and 2', list_of_dataset_sizes)
+        if use_3_datasets:
+            list_of_dataset_sizes.append(len(preprocessed_list3))
+            print('list 1 and 2 and 3', list_of_dataset_sizes)
+        list_of_dataset_sizes.sort(reverse=False)
+        smallest_dataset = int(list_of_dataset_sizes[0])
+        print('Largest dataset', smallest_dataset)
+        maximum_network_size = (smallest_dataset / 200)
+        print('max network size', maximum_network_size)
+        while minimum_block_size < maximum_network_size:
+            feature_cols = ['textlength', 'normailisedimages', 'normalisedmentions', 'normalisedlinks',
+                            'normalisedHashtags',
+                            'normalisedRetweets', 'normalisedReplies', 'sentiment', 'originals', 'publicationscore',
+                            'userValue', 'tweetValue', 'lists', 'value', 'Campaign Type']
+            with open(outputclusterfile4, "w", newline='') as output:
+                writer = csv.writer(output)
+                writer.writerow(feature_cols)
+            print('Using block of top', blocksize, 'hashtag networks')
+            hashtagtracker1 = separate_by_hashtags(preprocessed_list1)
+            if use_2_datasets:
+                hashtagtracker2 = separate_by_hashtags(preprocessed_list2)
+            if use_3_datasets:
+                hashtagtracker3 = separate_by_hashtags(preprocessed_list3)
+            run_hashtag_1_step_size(hashtagtracker1, minimum_block_size, blocksize)
+            if use_2_datasets:
+                run_hashtag_2_step_size(hashtagtracker1, minimum_block_size, blocksize)
+            if use_3_datasets:
+                run_hashtag_3_step_size(hashtagtracker1, minimum_block_size, blocksize)
+            result = simpleAIclassification(outputclusterfile4)
+            accuracy_result.append(result)
+            minimum_block_size = minimum_block_size + blocksize
+            blocktrack.append(minimum_block_size)
+            print(blocktrack, accuracy_result)
+        pyplot.scatter(blocktrack, accuracy_result, marker="s", s=80, cmap="black")
+        pyplot.show()
 
 
 
