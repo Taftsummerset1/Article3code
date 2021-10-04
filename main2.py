@@ -44,6 +44,7 @@ from sklearn.model_selection import GridSearchCV
 from sklearn.metrics import classification_report
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn.metrics import mean_squared_error
+from sklearn.model_selection import RandomizedSearchCV
 from math import sqrt
 
 """These inputs will change the output of the script, also needs to be tailored to the datasets being used
@@ -67,19 +68,20 @@ use_3_datasets = False #if true, will run three datasets - IMPORTANT - use_2_dat
 scatter2D = False # if true, will plot the two CNAs against whatever subspace has been identified.
 plot3d = False # if true, will plot in 3d after linear regression
 classify = True #use the NN classifier to determine the types of campaigns
-optimise_by_no_hashtags = False # use_hashtag must be false. Plots accuracy of AI using hashtag networks with specific tweets per network
+optimise_by_no_hashtags = False # use_hashtag and classify must be false. Plots accuracy of AI using hashtag networks with specific tweets per network
 optimise_by_hashtag_block = False #finds accurcy of AI using blocks of hashtag networks with set sizes
 no_of_rows_per_run = 500 #used to divide the main campaign
-no_of_tweets_per_hashtag = 100 #minimum number of tweets that can generate a hashtag - data division becomes important for model training in LR / IC function
-minimum_network_size = 50 #must be
-maximum_network_size = 100
+no_of_tweets_per_hashtag = 150 # only for simple hashtage comparison - data division becomes important for model training in LR / IC function
+min_hashtags_for_classify = 10 #This is part of the tuning for optimise function to make sure there is a sufficint number of hashtag networks for a linear optimisation.
+minimum_network_size = 10 #must be a multiple of 10 for the split function - for optimisation limits
+maximum_network_size = 300 #for optimisation limits
 step_size = 50  # for optimisation of classification
 time_delta = 3600 #in seconds (unix , 3600 = 1 hour, 86400 = day)
 K = 2 # number of campaigns being clustered
 threshold_classification = 100
 """ These parameters do not effect processing """
-campaigntype1 = 'Conflict1' #first dataset name / type of campaign (political, entertainment, culture, etc)
-campaigntype2 = 'Conflict2' #Second dataset type of campaign (political, entertainment, culture, etc)
+campaigntype1 = '#MTVEMA' #first dataset name / type of campaign (political, entertainment, culture, etc)
+campaigntype2 = '#zagrebearthquake' #Second dataset type of campaign (political, entertainment, culture, etc)
 campaigntype3 = 'Environmental' #Third dataset type of campaign (political, entertainment, culture, etc)
 
 """ These preset values will impact preprocessing only """
@@ -518,43 +520,48 @@ def scatter_in_2D(data_in1, data_in2, data_in3):
 
 def simpleAIclassification(data_in1):
     print(data_in1)
+    networksize = []
     df = pd.read_csv(data_in1).dropna()
     number_of_networks = df['Campaign Type'].value_counts()
-    print(number_of_networks)
-    x = df.drop('Campaign Type', axis=1)
-    y = df['Campaign Type']
-    trainX, testX, trainY, testY = train_test_split(x, y, test_size=0.3, random_state=1)
-    sc = StandardScaler()
-    scaler = sc.fit(trainX)
-    trainX_scaled = scaler.transform(trainX)
-    testX_scaled = scaler.transform(testX)
-    mlp_clf = MLPClassifier(hidden_layer_sizes=(150, 100, 50),
-                            max_iter=300, activation='relu',
-                            solver='adam')
+    for i in number_of_networks:
+        networksize.append(i)
+        if i > min_hashtags_for_classify:
+            x = df.drop('Campaign Type', axis=1)
+            y = df['Campaign Type']
+            trainX, testX, trainY, testY = train_test_split(x, y, test_size=0.3, random_state=1)
+            sc = StandardScaler()
+            scaler = sc.fit(trainX)
+            trainX_scaled = scaler.transform(trainX)
+            testX_scaled = scaler.transform(testX)
+            mlp_clf = MLPClassifier(hidden_layer_sizes=(150, 100, 50),
+                                    max_iter=300, activation='relu',
+                                    solver='adam')
 
-    mlp_clf.fit(trainX_scaled, trainY)
-    y_pred = mlp_clf.predict(testX_scaled)
+            mlp_clf.fit(trainX_scaled, trainY)
+            y_pred = mlp_clf.predict(testX_scaled)
 
-    print('Accuracy: {:.2f}'.format(accuracy_score(testY, y_pred)))
-    result = accuracy_score(testY, y_pred)
-    return result
-    #param_grid = {
-   #     'hidden_layer_sizes': [(150, 100, 50), (120, 80, 40), (100, 50, 30)],
-    #    'max_iter': [50, 100, 150],
-      #  'activation': ['tanh', 'relu'],
-     #   'solver': ['sgd', 'adam'],
-     #   'alpha': [0.0001, 0.05],
-      #  'learning_rate': ['constant', 'adaptive'],
-    #}
+            print('Accuracy: {:.2f}'.format(accuracy_score(testY, y_pred)))
+            result = accuracy_score(testY, y_pred)
+            return result
+        else:
+            return 0
+            # param_grid = {
+        #     'hidden_layer_sizes': [(150, 100, 50), (120, 80, 40), (100, 50, 30)],
+        #    'max_iter': [50, 100, 150],
+        #  'activation': ['tanh', 'relu'],
+        #   'solver': ['sgd', 'adam'],
+        #   'alpha': [0.0001, 0.05],
+        #  'learning_rate': ['constant', 'adaptive'],
+        # }
 
-    #grid = GridSearchCV(mlp_clf, param_grid, n_jobs=-1, cv=5)
-    #grid.fit(trainX_scaled, trainY)
+        # grid = GridSearchCV(mlp_clf, param_grid, n_jobs=-1, cv=5)
+        # grid.fit(trainX_scaled, trainY)
 
-    #print(grid.best_params_)
+        # print(grid.best_params_)
 
-    #grid_predictions = grid.predict(testX_scaled)
+        # grid_predictions = grid.predict(testX_scaled)
 
-    #print('Accuracy: {:.2f}'.format(accuracy_score(testY, grid_predictions)))
+        # print('Accuracy: {:.2f}'.format(accuracy_score(testY, grid_predictions)))
 
 
 def AIclassification(data_in1):
@@ -578,7 +585,7 @@ def AIclassification(data_in1):
     print('Accuracy: {:.2f}'.format(accuracy_score(testY, y_pred)))
 
     fig = plot_confusion_matrix(mlp_clf, testX_scaled, testY, display_labels=mlp_clf.classes_)
-    fig.figure_.suptitle("Confusion Matrix for two small similar conflict campaign Datasets")
+    fig.figure_.suptitle("{} Versus {}".format(campaigntype1, campaigntype2))
     pyplot.show()
 
     pyplot.plot(mlp_clf.loss_curve_)
@@ -597,24 +604,25 @@ def AIclassification(data_in1):
                 max_evals=2000)
     print(best)
     result = accuracy_score(testY, y_pred)
+
+    param_grid = {'hidden_layer_sizes': [(150, 100, 50), (120, 80, 40), (100, 50, 30)], 'max_iter': [50, 100, 150], 'activation': ['tanh', 'relu'], 'solver': ['sgd', 'adam'],  'alpha': [0.0001, 0.05],'learning_rate': ['constant', 'adaptive'],}
+
+    grid = GridSearchCV(mlp_clf, param_grid, n_jobs=-1, cv=5)
+    grid.fit(trainX_scaled, trainY)
+
+    print(grid.best_params_)
+
+    grid_predictions = grid.predict(testX_scaled)
+
+    print('Accuracy: {:.2f}'.format(accuracy_score(testY, grid_predictions)))
+
+    random = RandomizedSearchCV(mlp_clf, param_distributions=param_grid, cv = 5, n_jobs=-1, random_state=1)
+    start_time = time.time()
+    random_result = random.fit(trainX_scaled, trainY)
+    # Summarize results
+    print("Best: %f using %s" % (random_result.best_score_, random_result.best_params_))
+    print("Execution time: " + str((time.time() - start_time)) + ' ms')
     return result
-    #param_grid = {
-   #     'hidden_layer_sizes': [(150, 100, 50), (120, 80, 40), (100, 50, 30)],
-    #    'max_iter': [50, 100, 150],
-      #  'activation': ['tanh', 'relu'],
-     #   'solver': ['sgd', 'adam'],
-     #   'alpha': [0.0001, 0.05],
-      #  'learning_rate': ['constant', 'adaptive'],
-    #}
-
-    #grid = GridSearchCV(mlp_clf, param_grid, n_jobs=-1, cv=5)
-    #grid.fit(trainX_scaled, trainY)
-
-    #print(grid.best_params_)
-
-    #grid_predictions = grid.predict(testX_scaled)
-
-    #print('Accuracy: {:.2f}'.format(accuracy_score(testY, grid_predictions)))
 
 def separate_list_by_rows(list_in, no_of_rows):
     '''
@@ -742,12 +750,10 @@ def run_hashtag_1_step_size(hashtagtracker, minimum_block_size, blocksize):
         updateddump.close()
 
 def run_hashtag_1(hashtagtracker, step_size, minimum_network_size):
-    hashtagnetworks = {}
     run_no = 0
     cluster_dict1 = {}
-    for run_in1 in hashtagtracker:
-        run_in2 = hashtagtracker[run_in1]
-        hashtagnetworks[run_in1] = len(run_in2)
+    for run_in1 in hashtagtracker1:
+        run_in2 = hashtagtracker1[run_in1]
         if minimum_network_size <= len(run_in2) <= (
                 step_size + minimum_network_size):  # this number can be fine turned to determine the hashtag network size analysed.
             run_no = run_no + 1
@@ -755,14 +761,12 @@ def run_hashtag_1(hashtagtracker, step_size, minimum_network_size):
             print(len(run_in2))
             cluster_list1 = []
             net_attributes1 = calc_linear_regression_and_importance_coefficient(f'{run_in2}_{run_no}', run_in2)
-            # net_attributes1 = calc_decisiontreeregression_and_importance_coefficient(f'{run_in2}_{run_no}', run_in2)
-            # net_attributes1 = calc_linearRidge_and_importance_coefficient(f'{run_in2}_{run_no}', run_in2)
+            # net_attributes2 = calc_decisiontreeregression_and_importance_coefficient(f'{run_in2}_{run_no}', run_in2)
+            # net_attributes2 = calc_linearRidge_and_importance_coefficient(f'{run_in2}_{run_no}', run_in2)
             cluster_list1.append(net_attributes1['Feature: 1'])  # these features create the subspace
             cluster_list1.append(net_attributes1['Feature: 3'])
             cluster_list1.append(net_attributes1['Feature: 0'])
             cluster_dict1[run_in1] = cluster_list1
-            feature_cols = ['normailisedimages', 'normalisedmentions', 'normalisedlinks', 'normalisedHashtags',
-                    'normalisedRetweets', 'normalisedReplies', 'Campaign Type']
             with open(outputclusterfile1, "w", newline='', encoding='utf-8') as dump:
                 writer = csv.writer(dump)
                 writer.writerow(net_attributes1.values())
@@ -775,6 +779,7 @@ def run_hashtag_1(hashtagtracker, step_size, minimum_network_size):
                     writer.writerow(row)
             dump.close()
             updateddump.close()
+
 def run_hashtag_2_step_size(hashtagtracker, minimum_block_size, blocksize):
     no_of_hashtag_networks = 0
     print('processing the largest', blocksize, 'hashtag networks')
@@ -926,9 +931,9 @@ def run_hashtag_3(hashtagtracker3):
 
 if __name__ == '__main__':
     #determining the input files and output files for the various types of routines that can be called
-    infile1 = "D:/Datasets/TweetBinder and Other datasets/Twitter Balakot datasets/5dd75c59-233c-47e7-ad25-e493710778fe.json"
+    infile1 = "D:/Datasets/TweetBinder and Other datasets/#MTVEMA.json"
     if use_2_datasets:
-        infile2 = "D:/Datasets/TweetBinder and Other datasets/Twitter Balakot datasets/41eb23f5-6e0e-4664-8a76-d7aafeadea4b.json"
+        infile2 = "D:/Datasets/TweetBinder and Other datasets/#zagrebearthquake.json"
     if use_3_datasets:
         infile3 = "D:/Datasets/TweetBinder and Other datasets/#ARRESTTRUMPNOW.json"
     outputclusterfile1 = "D:/Datasets/TweetBinder and Other datasets/Twitter Balakot datasets/clusterfile1.csv"
@@ -1143,6 +1148,7 @@ if __name__ == '__main__':
             run_in2 = hashtagtracker[run_in1]
             if minimum_network_size <= len(run_in2) <= no_of_tweets_per_hashtag:  # this number can be fine turned to determine the hashtag network size analysed.
                 run_no = run_no + 1
+                print('hashtag network size', minimum_network_size, 'to', no_of_tweets_per_hashtag)
                 print('running hashtag', run_in1)
                 print(len(run_in2))
                 cluster_list1 = []
@@ -1249,6 +1255,7 @@ if __name__ == '__main__':
             AIclassification(outputclusterfile4)
 
     if optimise_by_no_hashtags:
+
         list_of_dataset_sizes = []
         smallest = []
         network_size = []
@@ -1273,13 +1280,20 @@ if __name__ == '__main__':
         #rouned_max = step_size * round(maximum_network_size/step_size)
         #print('rounded max', rouned_max)
         print('max network size', maximum_network_size)
+        run_no = 0
         while minimum_network_size < maximum_network_size:
+            print('min_net_size', minimum_network_size)
+            print('step size', step_size)
+            print('run_no', run_no)
+            if run_no == 0:
+                print('Running hashtag networks between', minimum_network_size, 'and', step_size)
+            else:
+                print('Running hashtag networks between', minimum_network_size, 'and', (step_size + minimum_network_size))
             feature_cols = ['normailisedimages', 'normalisedmentions', 'normalisedlinks', 'normalisedHashtags',
                     'normalisedRetweets', 'normalisedReplies', 'Campaign Type']
             with open(outputclusterfile4, "w", newline='') as output:
                 writer = csv.writer(output)
                 writer.writerow(feature_cols)
-            print('this is min', (minimum_network_size), 'this is max', (minimum_network_size + step_size))
             hashtagtracker1 = separate_by_hashtags(preprocessed_list1)
             if use_2_datasets:
                 hashtagtracker2 = separate_by_hashtags(preprocessed_list2)
@@ -1292,10 +1306,20 @@ if __name__ == '__main__':
                 run_hashtag_3(hashtagtracker3)
             result = simpleAIclassification(outputclusterfile4)
             accuracy_result.append(result)
-            network_size.append(minimum_network_size + step_size)
-            minimum_network_size = minimum_network_size + step_size
+            if run_no == 0:
+                minimum_network_size = step_size
+                network_size.append(minimum_network_size)
+            else:
+                minimum_network_size = minimum_network_size + step_size
+                network_size.append(minimum_network_size)
             print(network_size, accuracy_result)
+            run_no = run_no + 1
         pyplot.scatter(network_size, accuracy_result, marker="s", s=80, cmap="black")
+        fileNameTemplate = r'D:/Datasets/AccPlot.jpeg'
+        plt.pyplot.savefig(fileNameTemplate.format(), format='jpeg', bbox_inches='tight')
+        plt.pyplot.title("{} Versus {}".format(campaigntype1, campaigntype2))
+        plt.pyplot.xlabel("Tweets Per Hashtag Network")
+        plt.pyplot.ylabel("Accuracy of Classification")
         pyplot.show()
 
     if optimise_by_hashtag_block:
